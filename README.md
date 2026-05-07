@@ -2,8 +2,11 @@
 
 A high-performance v2board backend based on modified xray-core.基于改进的xray-core的高性能v2board后端。
 
-[![Build and Release](https://github.com/Mcloud136/v2node/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/Mcloud136/v2node/actions/workflows/release.yml)
-(https://github.com/Mcloud136/v2node/releases/)[![Last Version](https://img.shields.io/github/release/hiddify/hiddify-next/all.svg?style=flat-square)](https://github.com/Mcloud136/v2node/releases/)[![Last Release Date](https://img.shields.io/github/release-date/hiddify/hiddify-next.svg?style=flat-square)](https://github.com/Mcloud136/v2node/releases/)[![commits](https://img.shields.io/github/commit-activity/m/hiddify/hiddify-next?style=flat-square)]
+[![Build and Release](https://img.shields.io/github/actions/workflow/status/Mcloud136/v2node/release.yml?label=build&logo=github)](https://github.com/Mcloud136/v2node/actions/workflows/release.yml)
+[![Last Version](https://img.shields.io/github/release/Mcloud136/v2node/all.svg?style=flat-square)](https://github.com/Mcloud136/v2node/releases/)
+[![Last Release Date](https://img.shields.io/github/release-date/Mcloud136/v2node.svg?style=flat-square)](https://github.com/Mcloud136/v2node/releases/)
+[![commits](https://img.shields.io/github/commit-activity/m/Mcloud136/v2node?style=flat-square)](https://github.com/Mcloud136/v2node/)
+
 
 ## 项目简介
 
@@ -70,7 +73,7 @@ v2node 是一个基于修改版 xray-core 的 V2board 节点服务端，支持�
 
 ### 架构支持
 
-- x86_64 (amd64) - 推荐
+- x86_64 (amd64) - 推荐(其余版本请自行构建）
 - ARM64 (aarch64)
 - s390x   ——s390x   - s390x   ——s390x
 
