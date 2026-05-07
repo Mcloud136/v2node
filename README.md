@@ -3,6 +3,7 @@
 A high-performance v2board backend based on modified xray-core.基于改进的xray-core的高性能v2board后端。
 
 [![Build and Release](https://github.com/Mcloud136/v2node/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/Mcloud136/v2node/actions/workflows/release.yml)
+(https://github.com/Mcloud136/v2node/releases/)[![Last Version](https://img.shields.io/github/release/hiddify/hiddify-next/all.svg?style=flat-square)](https://github.com/Mcloud136/v2node/releases/)[![Last Release Date](https://img.shields.io/github/release-date/hiddify/hiddify-next.svg?style=flat-square)](https://github.com/Mcloud136/v2node/releases/)[![commits](https://img.shields.io/github/commit-activity/m/hiddify/hiddify-next?style=flat-square)]
 
 ## 项目简介
 
