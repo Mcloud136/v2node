@@ -2,10 +2,10 @@
 
 A high-performance v2board backend based on modified xray-core.基于改进的xray-core的高性能v2board后端。
 
-[![Build and Release](https://img.shields.io/github/actions/workflow/status/Mcloud136/v2node/release.yml?label=build&logo=github)](https://github.com/Mcloud136/v2node/actions/workflows/release.yml)
-[![Last Version](https://img.shields.io/github/release/Mcloud136/v2node/all.svg?style=flat-square)](https://github.com/Mcloud136/v2node/releases/)
-[![Last Release Date](https://img.shields.io/github/release-date/Mcloud136/v2node.svg?style=flat-square)](https://github.com/Mcloud136/v2node/releases/)
-[![commits](https://img.shields.io/github/commit-activity/m/Mcloud136/v2node?style=flat-square)](https://github.com/Mcloud136/v2node/)
+[![Build](https://img.shields.io/github/actions/workflow/status/Mcloud136/v2node/release.yml?label=Build&logo=github&logoColor=white&color=28a745&style=for-the-badge)](https://github.com/Mcloud136/v2node/actions/workflows/release.yml)
+[![Version](https://img.shields.io/github/v/release/Mcloud136/v2node?label=Version&logo=semver&logoColor=white&color=0366d6&style=for-the-badge)](https://github.com/Mcloud136/v2node/releases/)
+[![Released](https://img.shields.io/github/release-date/Mcloud136/v2node?label=Released&logo=calendar&logoColor=white&color=6f42c1&style=for-the-badge)](https://github.com/Mcloud136/v2node/releases/)
+[![Commits](https://img.shields.io/github/commit-activity/m/Mcloud136/v2node?label=Commits&logo=git&logoColor=white&color=f1e05a&style=for-the-badge)](https://github.com/Mcloud136/v2node/)
 
 
 ## 项目简介
