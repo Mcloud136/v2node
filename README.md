@@ -2,6 +2,12 @@
 
 A high-performance v2board backend based on modified xray-core.基于改进的xray-core的高性能v2board后端。
 
+[![Build](https://img.shields.io/github/actions/workflow/status/Mcloud136/v2node/release.yml?label=Build&logo=github&logoColor=white&color=28a745&style=for-the-badge)](https://github.com/Mcloud136/v2node/actions/workflows/release.yml)
+[![Version](https://img.shields.io/github/v/release/Mcloud136/v2node?label=Version&logo=semver&logoColor=white&color=0366d6&style=for-the-badge)](https://github.com/Mcloud136/v2node/releases/)
+[![Released](https://img.shields.io/github/release-date/Mcloud136/v2node?label=Released&logo=calendar&logoColor=white&color=6f42c1&style=for-the-badge)](https://github.com/Mcloud136/v2node/releases/)
+[![Commits](https://img.shields.io/github/commit-activity/m/Mcloud136/v2node?label=Commits&logo=git&logoColor=white&color=f1e05a&style=for-the-badge)](https://github.com/Mcloud136/v2node/)
+
+
 ## 项目简介
 
 v2node 是一个基于修改版 xray-core 的 V2board 节点服务端，支持多种协议（vless、vmess、trojan、shadowsocks、hysteria2、tuic、anytls），具备流量限制、证书管理等核心功能。
@@ -67,7 +73,7 @@ v2node 是一个基于修改版 xray-core 的 V2board 节点服务端，支持�
 
 ### 架构支持
 
-- x86_64 (amd64) - 推荐
+- x86_64 (amd64) - 推荐(其余版本请自行构建）
 - ARM64 (aarch64)
 - s390x   ——s390x   - s390x   ——s390x
 
@@ -166,8 +172,7 @@ chmod +x /usr/bin/v2node
             "ApiHost": "https://your-panel.com/",
             "NodeID": 1,
             "ApiKey": "your-secret-api-key",
-            "Timeout": 15,
-            "RetryCount": 3
+            "Timeout": 15
         }
     ],
     "PprofPort": 6060
@@ -220,8 +225,7 @@ chmod +x /usr/bin/v2node
             "ApiHost": "https://panel2.example.com/",
             "NodeID": 2,
             "ApiKey": "key2",
-            "Timeout": 20,
-            "RetryCount": 2
+            "Timeout": 20
         }
     ]
 }
@@ -311,7 +315,7 @@ uname -m                          # 查看系统架构
 ### Q2: 无法连接到面板 API
 
 **解决方案**：
-1. 检查 `ApiHost` 是否正确，必须以 `/` 结尾
+1. 检查 `ApiHost` 是否正确，必须以 `http://或者https://` 开头
 2. 检查服务器网络是否能访问面板地址
 3. 检查防火墙是否放行出站流量
 
@@ -362,7 +366,7 @@ HTTPS 配置在 V2board 面板中完成，节点会自动获取证书配置。
 
 1. **防火墙配置**：只开放必要端口
 2. **定期更新**：保持软件版本最新
-3. **密钥管理**：妥善保管 `ApiKey`，避免泄露
+3. **密钥管理**：妥善保管并定期更新 `ApiKey`，避免泄露
 4. **日志监控**：定期检查日志，发现异常及时处理
 5. **权限控制**：建议使用非 root 用户运行
 
@@ -370,6 +374,15 @@ HTTPS 配置在 V2board 面板中完成，节点会自动获取证书配置。
 
 ## 更新日志
 
+### v1.0.1
+- 优化 Limiter 模块，使用 sync.Map 替代 map，消除性能瓶颈
+- 用户管理 Context 复用，减少内存分配和 GC 压力
+- 修复流量计数器超时参数传递问题
+- 更新 Go 版本为 1.26.2，修复构建兼容性
+- 添加 cloudflared 服务联动重启
+  
+  
+  
 ### v1.0.0
 - 优化并发性能和配置验证
 - 支持配置热更新
