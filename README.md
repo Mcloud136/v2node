@@ -2,6 +2,8 @@
 
 A high-performance v2board backend based on modified xray-core.基于改进的xray-core的高性能v2board后端。
 
+[![Build and Release](https://github.com/Mcloud136/v2node/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/Mcloud136/v2node/actions/workflows/release.yml)
+
 ## 项目简介
 
 v2node 是一个基于修改版 xray-core 的 V2board 节点服务端，支持多种协议（vless、vmess、trojan、shadowsocks、hysteria2、tuic、anytls），具备流量限制、证书管理等核心功能。
