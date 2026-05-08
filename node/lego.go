@@ -115,10 +115,14 @@ func (l *Lego) RenewCert() error {
 	} else if err != nil {
 		return fmt.Errorf("check cert error: %s", err)
 	}
-	res, err := l.client.Certificate.Renew(certificate.Resource{
+	res, err := l.client.Certificate.RenewWithOptions(certificate.Resource{
 		Domain:      l.config.CertDomain,
 		Certificate: file,
-	}, true, false, "")
+	}, certificate.RenewOptions{
+		Force:        true,
+		Bundle:       false,
+		PreferredIssuer: "",
+	})
 	if err != nil {
 		return err
 	}
