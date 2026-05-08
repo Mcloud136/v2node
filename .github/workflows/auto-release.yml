@@ -40,10 +40,9 @@ jobs:
         run: cd build && zip -r ../v2node-linux-64.zip .
       
       - name: Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v2.0.0
         with:
           tag_name: ${{ steps.tag.outputs.tag }}
           name: ${{ steps.tag.outputs.tag }}
           body: "Auto build\nCommit: ${{ github.sha }}"
-          files: v2node-linux-64.zip
-          token: ${{ secrets.GITHUB_TOKEN }}
+          files: ./v2node-linux-64.zip
