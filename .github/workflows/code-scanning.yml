@@ -13,6 +13,8 @@ permissions:
 jobs:
   scan:
     runs-on: ubuntu-latest
+    env:
+      NODE_VERSION: 20
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
