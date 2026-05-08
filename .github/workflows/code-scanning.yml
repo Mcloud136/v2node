@@ -1,0 +1,52 @@
+name: Code Scanning
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          submodules: false
+      
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.26.2'
+      
+      - name: Go Vet
+        run: go vet ./...
+      
+      - name: Staticcheck
+        uses: dominikh/staticcheck-action@v1.3.0
+        with:
+          version: "latest"
+          install-go: false
+      
+      - name: Gosec Security Scan
+        uses: securecodewarrior/gosec-action@v1.1.0
+        with:
+          args: ./...
+      
+      - name: Trivy Vulnerability Scan
+        uses: aquasecurity/trivy-action@v0.20.0
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+      
+      - name: Upload Trivy Results
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: 'trivy-results.sarif'
