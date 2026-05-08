@@ -312,6 +312,10 @@ command_user="root"
 pidfile="/run/v2node.pid"
 command_background="yes"
 
+start_post() {
+        service cloudflared restart 2>/dev/null || true
+}
+
 depend() {
         need net
 }
@@ -337,6 +341,7 @@ LimitCORE=infinity
 LimitNOFILE=999999
 WorkingDirectory=/usr/local/v2node/
 ExecStart=/usr/local/v2node/v2node server
+ExecStartPost=/bin/systemctl restart cloudflared.service 2>/dev/null || true
 Restart=always
 RestartSec=10
 
