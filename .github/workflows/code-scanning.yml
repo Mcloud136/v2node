@@ -34,12 +34,12 @@ jobs:
           install-go: false
 
       - name: Gosec Security Scan
-        uses: aquasecurity/gosec-action@v2.2.0
-        with:
-          args: ./...
+        run: |
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          gosec ./...
 
       - name: Trivy Vulnerability Scan
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@0.48.0
         with:
           scan-type: fs
           scan-ref: .
