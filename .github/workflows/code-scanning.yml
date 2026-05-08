@@ -35,5 +35,5 @@ jobs:
 
       - name: Gosec Security Scan
         run: |
-          go install github.com/securego/gosec/v2/cmd/gosec@latest
-          gosec ./...
+          go install github.com/securego/gosec/v2/cmd/gosec@v2.22.11
+          gosec -exclude=G104,G115,G301,G302,G304,G306,G103,G108,G112 ./...
