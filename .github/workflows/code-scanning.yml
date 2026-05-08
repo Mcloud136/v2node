@@ -39,7 +39,7 @@ jobs:
           gosec ./...
 
       - name: Trivy Vulnerability Scan
-        uses: aquasecurity/trivy-action@v0.44.0
+        uses: aquasecurity/trivy-action@0.44.0
         with:
           scan-type: fs
           scan-ref: .
