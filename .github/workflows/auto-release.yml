@@ -24,6 +24,13 @@ jobs:
         with:
           go-version: '1.26.2'
 
+      - name: Generate release tag
+        id: generate_tag
+        run: |
+          TAG_DATE=$(date +%Y%m%d)
+          TAG_NUM=$(printf "%02d" $(( ${GITHUB_RUN_NUMBER} % 100 )))
+          echo "tag_name=v${TAG_DATE}-${TAG_NUM}" >> $GITHUB_OUTPUT
+
       - name: Get project dependencies
         run: go mod download
 
@@ -60,8 +67,8 @@ jobs:
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: latest
-          name: Latest Linux Build
+          tag_name: ${{ steps.generate_tag.outputs.tag_name }}
+          name: ${{ steps.generate_tag.outputs.tag_name }}
           body: "该版本为自动构建\n\nCommit: ${{ github.sha }}\n\n包含:\n- v2node 可执行文件\n- geoip.dat\n- geosite.dat\n- README.md\n- LICENSE"
           files: |
             ./v2node-linux-64.zip
