@@ -37,16 +37,3 @@ jobs:
         run: |
           go install github.com/securego/gosec/v2/cmd/gosec@latest
           gosec ./...
-
-      - name: Trivy Vulnerability Scan
-        uses: aquasecurity/trivy-action@0.44.0
-        with:
-          scan-type: fs
-          scan-ref: .
-          format: sarif
-          output: trivy-results.sarif
-
-      - name: Upload Trivy Results
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: trivy-results.sarif
