@@ -44,5 +44,5 @@ jobs:
         with:
           tag_name: ${{ steps.tag.outputs.tag }}
           name: ${{ steps.tag.outputs.tag }}
-          body: "Auto build\nCommit: ${{ github.sha }}"
+          body: "该版本为自动生成\nCommit: ${{ github.sha }}"
           files: ./v2node-linux-64.zip
