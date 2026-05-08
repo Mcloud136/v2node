@@ -2,9 +2,11 @@ name: Code Scanning
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
   pull_request:
-    branches: [ main ]
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -13,8 +15,6 @@ permissions:
 jobs:
   scan:
     runs-on: ubuntu-latest
-    env:
-      NODE_VERSION: 20
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -30,7 +30,7 @@ jobs:
       - name: Staticcheck
         uses: dominikh/staticcheck-action@v1.3.1
         with:
-          version: "latest"
+          version: latest
           install-go: false
 
       - name: Gosec Security Scan
@@ -41,12 +41,12 @@ jobs:
       - name: Trivy Vulnerability Scan
         uses: aquasecurity/trivy-action@0.28.0
         with:
-          scan-type: 'fs'
-          scan-ref: '.'
-          format: 'sarif'
-          output: 'trivy-results.sarif'
+          scan-type: fs
+          scan-ref: .
+          format: sarif
+          output: trivy-results.sarif
 
       - name: Upload Trivy Results
         uses: github/codeql-action/upload-sarif@v4
         with:
-          sarif_file: 'trivy-results.sarif'
+          sarif_file: trivy-results.sarif
