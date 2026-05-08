@@ -30,18 +30,18 @@ jobs:
         run: go vet ./...
       
       - name: Staticcheck
-        uses: dominikh/staticcheck-action@v1.3.0
+        uses: dominikh/staticcheck-action@v1.3.1
         with:
           version: "latest"
           install-go: false
       
       - name: Gosec Security Scan
-        run: |
-          go install github.com/securego/gosec/v2/cmd/gosec@latest
-          gosec ./...
+        uses: aquasecurity/gosec-action@v2.2.0
+        with:
+          args: ./...
       
       - name: Trivy Vulnerability Scan
-        uses: aquasecurity/trivy-action@0.35.0
+        uses: aquasecurity/trivy-action@v0.48.0
         with:
           scan-type: 'fs'
           scan-ref: '.'
