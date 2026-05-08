@@ -16,6 +16,7 @@ import (
 	"github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/core"
 	"github.com/xtls/xray-core/features/inbound"
+	"github.com/xtls/xray-core/infra/conf"
 	coreConf "github.com/xtls/xray-core/infra/conf"
 )
 
@@ -422,8 +423,8 @@ func buildHysteria2(nodeInfo *panel.NodeInfo, inbound *coreConf.InboundDetourCon
 	}
 
 	t := coreConf.TransportProtocol("hysteria")
-	up := coreConf.Bandwidth(strconv.Itoa(s.UpMbps) + "mbps")
-	down := coreConf.Bandwidth(strconv.Itoa(s.DownMbps) + "mbps")
+	up := conf.Bandwidth(strconv.Itoa(s.UpMbps) + "mbps")
+	down := conf.Bandwidth(strconv.Itoa(s.DownMbps) + "mbps")
 	inbound.StreamSetting = &coreConf.StreamConfig{Network: &t}
 	hysteriasetting := &coreConf.HysteriaConfig{
 		Version: 2,
@@ -438,7 +439,7 @@ func buildHysteria2(nodeInfo *panel.NodeInfo, inbound *coreConf.InboundDetourCon
 	}
 	if s.Obfs != "" && s.ObfsPassword != "" {
 		rawobfsJSON := json.RawMessage(fmt.Sprintf(`{"password":"%s"}`, s.ObfsPassword))
-		finalmask.Udp = []coreConf.Mask{
+		finalmask.Udp = []conf.Mask{
 			{
 				Type:     s.Obfs,
 				Settings: &rawobfsJSON,

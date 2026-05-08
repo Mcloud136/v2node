@@ -118,11 +118,7 @@ func (l *Lego) RenewCert() error {
 	res, err := l.client.Certificate.RenewWithOptions(certificate.Resource{
 		Domain:      l.config.CertDomain,
 		Certificate: file,
-	}, certificate.RenewOptions{
-		Force:        true,
-		Bundle:       false,
-		PreferredIssuer: "",
-	})
+	}, nil)
 	if err != nil {
 		return err
 	}

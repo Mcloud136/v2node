@@ -52,7 +52,10 @@ func (dt *DeviceTracker) TrackDevice(taguuid, ip string, uid, deviceLimit int) b
 	key := taguuid + ":" + ip
 
 	if existingUID, loaded := dt.onlineIPs.LoadOrStore(key, uid); loaded {
-		return existingUID.(int) != uid
+		if existingUID.(int) == uid {
+			return false
+		}
+		return true
 	}
 
 	if deviceLimit > 0 {
