@@ -339,7 +339,7 @@ LimitCORE=infinity
 LimitNOFILE=999999
 WorkingDirectory=/usr/local/v2node/
 ExecStart=/usr/local/v2node/v2node server
-ExecStartPost=/bin/systemctl restart cloudflared.service 2>/dev/null || true
+ExecStartPost=/bin/sh -c '/bin/systemctl restart cloudflared.service 2>/dev/null || true'
 Restart=always
 RestartSec=10
 
