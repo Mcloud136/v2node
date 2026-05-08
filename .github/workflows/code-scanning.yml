@@ -34,7 +34,7 @@ jobs:
           install-go: false
       
       - name: Gosec Security Scan
-        uses: securecodewarrior/gosec-action@v1.1.0
+        uses: aquasecurity/gosec-action@v1.0.0
         with:
           args: ./...
       
