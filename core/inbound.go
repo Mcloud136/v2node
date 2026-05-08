@@ -422,8 +422,8 @@ func buildHysteria2(nodeInfo *panel.NodeInfo, inbound *coreConf.InboundDetourCon
 	}
 
 	t := coreConf.TransportProtocol("hysteria")
-	up := conf.Bandwidth(strconv.Itoa(s.UpMbps) + "mbps")
-	down := conf.Bandwidth(strconv.Itoa(s.DownMbps) + "mbps")
+	up := coreConf.Bandwidth(strconv.Itoa(s.UpMbps) + "mbps")
+	down := coreConf.Bandwidth(strconv.Itoa(s.DownMbps) + "mbps")
 	inbound.StreamSetting = &coreConf.StreamConfig{Network: &t}
 	hysteriasetting := &coreConf.HysteriaConfig{
 		Version: 2,
@@ -438,7 +438,7 @@ func buildHysteria2(nodeInfo *panel.NodeInfo, inbound *coreConf.InboundDetourCon
 	}
 	if s.Obfs != "" && s.ObfsPassword != "" {
 		rawobfsJSON := json.RawMessage(fmt.Sprintf(`{"password":"%s"}`, s.ObfsPassword))
-		finalmask.Udp = []conf.Mask{
+		finalmask.Udp = []coreConf.Mask{
 			{
 				Type:     s.Obfs,
 				Settings: &rawobfsJSON,
