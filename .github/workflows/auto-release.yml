@@ -35,6 +35,9 @@ jobs:
       - name: Copy README.md
         run: cp ${GITHUB_WORKSPACE}/README.md ./build_assets/README.md
 
+      - name: Copy LICENSE
+        run: cp ${GITHUB_WORKSPACE}/LICENSE ./build_assets/LICENSE
+
       - name: Download geoip.dat and geosite.dat
         run: |
           LIST=('geoip' 'geosite')
@@ -59,7 +62,7 @@ jobs:
         with:
           tag_name: latest
           name: Latest Linux Build
-          body: "Automated daily build for Linux x86_64\n\nCommit: ${{ github.sha }}\n\nIncludes:\n- v2node binary\n- geoip.dat\n- geosite.dat\n- README.md"
+          body: "该版本为自动构建\n\nCommit: ${{ github.sha }}\n\n包含:\n- v2node 可执行文件\n- geoip.dat\n- geosite.dat\n- README.md\n- LICENSE"
           files: |
             ./v2node-linux-64.zip
           draft: false
