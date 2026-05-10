@@ -103,10 +103,10 @@ A high-performance v2board backend based on modified xray-core.基于改进的xr
 
 | 版本 | 新增功能 |
 |-----|---------|
-| 1.0.1 | cloudflared 服务联动重启 |
+| 1.0.0 | cloudflared 服务联动重启 |
 | 1.0.1 | Go 版本更新至 1.26.2，修复构建兼容性 |
-| 1.0.2 | 文档格式优化 |
-| 1.0.2 | 代码格式化规范 |
+| 1.0.2 | 大幅度提升性能 |
+
 
 ---
 ---
