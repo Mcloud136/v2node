@@ -2,8 +2,8 @@ package panel
 
 import (
 	"errors"
-	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -33,7 +33,15 @@ func New(c *conf.NodeConfig) (*Client, error) {
 		retryCount = *c.RetryCount
 	}
 	client.SetRetryCount(retryCount)
-	client.SetHeader("User-Agent", fmt.Sprintf("v2node go-resty/%s (https://github.com/go-resty/resty)", resty.Version))
+	
+	// 使用strings.Builder优化User-Agent字符串构造
+	var userAgent strings.Builder
+	userAgent.Grow(len("v2node go-resty/ (https://github.com/go-resty/resty)") + len(resty.Version))
+	userAgent.WriteString("v2node go-resty/")
+	userAgent.WriteString(resty.Version)
+	userAgent.WriteString(" (https://github.com/go-resty/resty)")
+	client.SetHeader("User-Agent", userAgent.String())
+	
 	if c.Timeout > 0 {
 		client.SetTimeout(time.Duration(c.Timeout) * time.Second)
 	} else {

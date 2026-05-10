@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -166,14 +165,36 @@ func (c *Client) GetNodeInfo(ctx context.Context) (node *NodeInfo, err error) {
 	default:
 		return nil, fmt.Errorf("unsupport protocol: %s", cm.Protocol)
 	}
-	node.Tag = fmt.Sprintf("[%s]-%s:%d", c.APIHost, node.Type, node.Id)
+	// 优化Tag字符串构造
+	var tagBuilder strings.Builder
+	tagBuilder.Grow(len(c.APIHost) + len(node.Type) + 20)
+	tagBuilder.WriteString("[")
+	tagBuilder.WriteString(c.APIHost)
+	tagBuilder.WriteString("]-")
+	tagBuilder.WriteString(node.Type)
+	tagBuilder.WriteString(":")
+	tagBuilder.WriteString(strconv.Itoa(node.Id))
+	node.Tag = tagBuilder.String()
+	
 	cf := cm.TlsSettings.CertFile
 	kf := cm.TlsSettings.KeyFile
 	if cf == "" {
-		cf = filepath.Join("/etc/v2node/", cm.Protocol+strconv.Itoa(c.NodeId)+".cer")
+		var certBuilder strings.Builder
+		certBuilder.Grow(len("/etc/v2node/") + len(cm.Protocol) + 20)
+		certBuilder.WriteString("/etc/v2node/")
+		certBuilder.WriteString(cm.Protocol)
+		certBuilder.WriteString(strconv.Itoa(c.NodeId))
+		certBuilder.WriteString(".cer")
+		cf = certBuilder.String()
 	}
 	if kf == "" {
-		kf = filepath.Join("/etc/v2node/", cm.Protocol+strconv.Itoa(c.NodeId)+".key")
+		var keyBuilder strings.Builder
+		keyBuilder.Grow(len("/etc/v2node/") + len(cm.Protocol) + 20)
+		keyBuilder.WriteString("/etc/v2node/")
+		keyBuilder.WriteString(cm.Protocol)
+		keyBuilder.WriteString(strconv.Itoa(c.NodeId))
+		keyBuilder.WriteString(".key")
+		kf = keyBuilder.String()
 	}
 	cm.CertInfo = &CertInfo{
 		CertMode:         cm.TlsSettings.CertMode,
