@@ -190,10 +190,16 @@ func (d *DefaultDispatcher) getLink(ctx context.Context) (*transport.Link, *tran
 			common.Interrupt(inboundLink.Reader)
 			return nil, nil, nil, errors.New("Limited ", user.Email, " by conn or ip")
 		}
-		lmVal, _ := d.LinkManagers.LoadOrStore(user.Email, &LinkManager{
-			links: make(map[*ManagedWriter]buf.Reader),
-		})
-		lm := lmVal.(*LinkManager)
+		// 优化 LinkManagers 的加载
+		var lm *LinkManager
+		if lmVal, ok := d.LinkManagers.Load(user.Email); ok {
+			lm = lmVal.(*LinkManager)
+		} else {
+			lm = &LinkManager{
+				links: make(map[*ManagedWriter]buf.Reader),
+			}
+			d.LinkManagers.Store(user.Email, lm)
+		}
 		managedWriter := &ManagedWriter{
 			writer:  uplinkWriter,
 			manager: lm,
@@ -205,9 +211,14 @@ func (d *DefaultDispatcher) getLink(ctx context.Context) (*transport.Link, *tran
 			inboundLink.Writer = rate.NewRateLimitWriter(inboundLink.Writer, w)
 			outboundLink.Writer = rate.NewRateLimitWriter(outboundLink.Writer, w)
 		}
-		counterVal, _ := d.Counter.LoadOrStore(sessionInbound.Tag, counter.NewTrafficCounter())
-		t := counterVal.(*counter.TrafficCounter)
-
+		// 优化 Counter 的加载
+		var t *counter.TrafficCounter
+		if counterVal, ok := d.Counter.Load(sessionInbound.Tag); ok {
+			t = counterVal.(*counter.TrafficCounter)
+		} else {
+			t = counter.NewTrafficCounter()
+			d.Counter.Store(sessionInbound.Tag, t)
+		}
 		ts := t.GetCounter(user.Email)
 		upcounter := &counter.XrayTrafficCounter{V: &ts.UpCounter}
 		downcounter := &counter.XrayTrafficCounter{V: &ts.DownCounter}

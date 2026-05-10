@@ -19,7 +19,7 @@ func (c *CounterReader) ReadMultiBufferTimeout(timeout time.Duration) (buf.Multi
 	if err != nil {
 		return nil, err
 	}
-	if mb.Len() > 0 {
+	if !mb.IsEmpty() {
 		c.Counter.Add(int64(mb.Len()))
 	}
 	return mb, nil
@@ -30,7 +30,7 @@ func (c *CounterReader) ReadMultiBuffer() (buf.MultiBuffer, error) {
 	if err != nil {
 		return nil, err
 	}
-	if mb.Len() > 0 {
+	if !mb.IsEmpty() {
 		c.Counter.Add(int64(mb.Len()))
 	}
 	return mb, nil
