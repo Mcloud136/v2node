@@ -8,6 +8,11 @@ import (
 type TrafficCounter struct {
 	Counters sync.Map
 	// 最近使用的计数器，减少 sync.Map 的查找
+	// 注意：此缓存不需要定期清理，原因：
+	// 1. 当用户被删除时，Delete() 会同时清理 cache 和 Counters
+	// 2. 在流量上报时会自动清理不存在的用户
+	// 3. cache 只是 Counters 的副本，主数据在 Counters 中
+	// 4. 如果缓存条目不存在，会自动从 Counters 中恢复
 	cache sync.Map // string -> *TrafficStorage
 }
 
