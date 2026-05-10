@@ -1,6 +1,7 @@
 package rate
 
 import (
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -8,6 +9,13 @@ import (
 	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/buf"
 )
+
+// 为 Writer 和 DynamicBucket 添加对象池以减少分配
+var writerPool = sync.Pool{
+	New: func() interface{} {
+		return &Writer{}
+	},
+}
 
 type Writer struct {
 	writer  buf.Writer
@@ -35,14 +43,19 @@ func (d *DynamicBucket) Update(rate int64) {
 }
 
 func NewRateLimitWriter(writer buf.Writer, limiter *DynamicBucket) buf.Writer {
-	return &Writer{
-		writer:  writer,
-		limiter: limiter,
-	}
+	w := writerPool.Get().(*Writer)
+	w.writer = writer
+	w.limiter = limiter
+	return w
 }
 
 func (w *Writer) Close() error {
-	return common.Close(w.writer)
+	err := common.Close(w.writer)
+	// 清理字段并放回池中
+	w.writer = nil
+	w.limiter = nil
+	writerPool.Put(w)
+	return err
 }
 
 func (w *Writer) WriteMultiBuffer(mb buf.MultiBuffer) error {

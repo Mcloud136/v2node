@@ -49,9 +49,15 @@ func NewDeviceTracker(aliveList map[int]int) *DeviceTracker {
 }
 
 func (dt *DeviceTracker) TrackDevice(taguuid, ip string, uid, deviceLimit int) bool {
-	key := taguuid + ":" + ip
+	// 使用 strings.Builder 构建 key，减少字符串拼接
+	var key strings.Builder
+	key.Grow(len(taguuid) + 1 + len(ip))
+	key.WriteString(taguuid)
+	key.WriteByte(':')
+	key.WriteString(ip)
+	keyStr := key.String()
 
-	if existingUID, loaded := dt.onlineIPs.LoadOrStore(key, uid); loaded {
+	if existingUID, loaded := dt.onlineIPs.LoadOrStore(keyStr, uid); loaded {
 		return existingUID.(int) != uid
 	}
 
@@ -62,7 +68,7 @@ func (dt *DeviceTracker) TrackDevice(taguuid, ip string, uid, deviceLimit int) b
 			count = countVal.(int)
 		}
 		if count >= deviceLimit {
-			dt.onlineIPs.Delete(key)
+			dt.onlineIPs.Delete(keyStr)
 			return true
 		}
 	}
