@@ -38,6 +38,7 @@ type DeviceTracker struct {
 	onlineIPs  sync.Map // Key: taguuid:ip -> uid
 	oldOnline  sync.Map // Key: ip -> uid
 	aliveCount sync.Map // Key: uid -> count
+	userIPs    sync.Map // Key: taguuid -> map[string]struct{} (反向索引，用户的IP列表)
 }
 
 func NewDeviceTracker(aliveList map[int]int) *DeviceTracker {
@@ -61,6 +62,16 @@ func (dt *DeviceTracker) TrackDevice(taguuid, ip string, uid, deviceLimit int) b
 		return existingUID.(int) != uid
 	}
 
+	// 维护反向索引
+	if ipMapVal, ok := dt.userIPs.Load(taguuid); ok {
+		ipMap := ipMapVal.(map[string]struct{})
+		ipMap[ip] = struct{}{}
+	} else {
+		newIPMap := make(map[string]struct{})
+		newIPMap[ip] = struct{}{}
+		dt.userIPs.Store(taguuid, newIPMap)
+	}
+
 	if deviceLimit > 0 {
 		countVal, _ := dt.aliveCount.Load(uid)
 		count := 0
@@ -69,6 +80,14 @@ func (dt *DeviceTracker) TrackDevice(taguuid, ip string, uid, deviceLimit int) b
 		}
 		if count >= deviceLimit {
 			dt.onlineIPs.Delete(keyStr)
+			// 同时清理反向索引
+			if ipMapVal, ok := dt.userIPs.Load(taguuid); ok {
+				ipMap := ipMapVal.(map[string]struct{})
+				delete(ipMap, ip)
+				if len(ipMap) == 0 {
+					dt.userIPs.Delete(taguuid)
+				}
+			}
 			return true
 		}
 	}
@@ -115,9 +134,20 @@ func (dt *DeviceTracker) GetOnlineDevices() []panel.OnlineUser {
 	for _, ipKey := range toDelete {
 		if uidVal, ok := dt.onlineIPs.LoadAndDelete(ipKey); ok {
 			uid := uidVal.(int)
-			ip := ipKey[strings.LastIndex(ipKey, ":")+1:]
+			colonIndex := strings.LastIndex(ipKey, ":")
+			taguuid := ipKey[:colonIndex]
+			ip := ipKey[colonIndex+1:]
 			dt.oldOnline.Store(ip, uid)
 			result = append(result, panel.OnlineUser{UID: uid, IP: ip})
+			
+			// 清理反向索引
+			if ipMapVal, ok := dt.userIPs.Load(taguuid); ok {
+				ipMap := ipMapVal.(map[string]struct{})
+				delete(ipMap, ip)
+				if len(ipMap) == 0 {
+					dt.userIPs.Delete(taguuid)
+				}
+			}
 		}
 	}
 
@@ -125,12 +155,21 @@ func (dt *DeviceTracker) GetOnlineDevices() []panel.OnlineUser {
 }
 
 func (dt *DeviceTracker) DeleteUser(taguuid string) {
-	dt.onlineIPs.Range(func(key, value interface{}) bool {
-		if strings.HasPrefix(key.(string), taguuid+":") {
-			dt.onlineIPs.Delete(key)
+	// 使用反向索引快速删除，避免遍历整个 Map
+	if ipMapVal, ok := dt.userIPs.Load(taguuid); ok {
+		ipMap := ipMapVal.(map[string]struct{})
+		// 预构建完整的 key 并删除
+		for ip := range ipMap {
+			var key strings.Builder
+			key.Grow(len(taguuid) + 1 + len(ip))
+			key.WriteString(taguuid)
+			key.WriteByte(':')
+			key.WriteString(ip)
+			dt.onlineIPs.Delete(key.String())
 		}
-		return true
-	})
+		// 清理反向索引
+		dt.userIPs.Delete(taguuid)
+	}
 }
 
 func AddLimiter(nodetype string, tag string, users []panel.UserInfo, aliveList map[int]int) *Limiter {
