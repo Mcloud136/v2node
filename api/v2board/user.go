@@ -110,6 +110,7 @@ type UserTraffic struct {
 func (c *Client) ReportUserTraffic(ctx context.Context, userTraffic []UserTraffic) error {
 	data := make(map[int][]int64, len(userTraffic))
 	for i := range userTraffic {
+		// 直接使用索引访问，避免范围变量复制
 		data[userTraffic[i].UID] = []int64{userTraffic[i].Upload, userTraffic[i].Download}
 	}
 	const path = "/api/v1/server/UniProxy/push"
@@ -118,10 +119,7 @@ func (c *Client) ReportUserTraffic(ctx context.Context, userTraffic []UserTraffi
 		SetBody(data).
 		ForceContentType("application/json").
 		Post(path)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func (c *Client) ReportNodeOnlineUsers(ctx context.Context, data *map[int][]string) error {

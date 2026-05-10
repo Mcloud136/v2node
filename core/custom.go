@@ -101,19 +101,28 @@ func GetCustomConfig(infos []*panel.NodeInfo) (*dns.Config, []*core.OutboundHand
 	if !hasPublicIPv6() {
 		queryStrategy = "UseIPv4"
 	}
-	coreDnsConfig := &coreConf.DNSConfig{
-		Servers: []*coreConf.NameServerConfig{
-			{
-				Address: &coreConf.Address{
-					Address: xnet.ParseAddress("localhost"),
-				},
-			},
-		},
-		QueryStrategy: queryStrategy,
+	
+	// 预计算总路由数量，用于容量预分配
+	totalRoutes := 0
+	for _, info := range infos {
+		totalRoutes += len(info.Common.Routes)
 	}
+	
+	coreDnsConfig := &coreConf.DNSConfig{
+		Servers: make([]*coreConf.NameServerConfig, 0, 1+totalRoutes/4),
+	}
+	// 添加默认 DNS 服务器
+	coreDnsConfig.Servers = append(coreDnsConfig.Servers, &coreConf.NameServerConfig{
+		Address: &coreConf.Address{
+			Address: xnet.ParseAddress("localhost"),
+		},
+	})
+	coreDnsConfig.QueryStrategy = queryStrategy
+	
 	//outbound
 	defaultoutbound, _ := buildDefaultOutbound()
-	coreOutboundConfig := append([]*core.OutboundHandlerConfig{}, defaultoutbound)
+	coreOutboundConfig := make([]*core.OutboundHandlerConfig, 0, 3+totalRoutes/4)
+	coreOutboundConfig = append(coreOutboundConfig, defaultoutbound)
 	block, _ := buildBlockOutbound()
 	coreOutboundConfig = append(coreOutboundConfig, block)
 	dns, _ := buildDnsOutbound()
@@ -127,9 +136,10 @@ func GetCustomConfig(infos []*panel.NodeInfo) (*dns.Config, []*core.OutboundHand
 		"outboundTag": "dns_out",
 	})
 	coreRouterConfig := &coreConf.RouterConfig{
-		RuleList:       []json.RawMessage{dnsRule},
+		RuleList:       make([]json.RawMessage, 0, 1+totalRoutes),
 		DomainStrategy: &domainStrategy,
 	}
+	coreRouterConfig.RuleList = append(coreRouterConfig.RuleList, dnsRule)
 
 	for _, info := range infos {
 		if len(info.Common.Routes) == 0 {
