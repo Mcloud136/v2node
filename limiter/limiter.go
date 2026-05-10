@@ -139,7 +139,7 @@ func (dt *DeviceTracker) GetOnlineDevices() []panel.OnlineUser {
 			ip := ipKey[colonIndex+1:]
 			dt.oldOnline.Store(ip, uid)
 			result = append(result, panel.OnlineUser{UID: uid, IP: ip})
-			
+
 			// 清理反向索引
 			if ipMapVal, ok := dt.userIPs.Load(taguuid); ok {
 				ipMap := ipMapVal.(map[string]struct{})

@@ -59,11 +59,11 @@ A high-performance v2board backend based on modified xray-core.基于改进的xr
 | 系统 | 最低版本 | 说明 |
 |------|----------|------|
 | CentOS | 7 | CentOS 7 无法使用 hysteria1/2 协议 |
-| Ubuntu | 16 | 推荐 18.04+ |   | Ubuntu | 16 | 推荐 18.04  || Ubuntu | 16 | 推荐 18.04  |   | Ubuntu | 16 | 推荐 18.04  || Ubuntu | 16 | 推荐 18.04  |   | Ubuntu | 16 | 推荐 18.04  || Ubuntu | 16 | 推荐 18.04  |   | Ubuntu | 16 | 推荐 18.04  || Ubuntu | 16 | 推荐 18.04  |   | Ubuntu | 16 | 推荐 18.04  || Ubuntu | 16 | 推荐 18.04  |   | Ubuntu | 16 | 推荐 18.04  || Ubuntu | 16 | 推荐 18.04  |   | Ubuntu | 16 | 推荐 18.04  || Ubuntu | 16 | 推荐 18.04  |   | Ubuntu | 16 | 推荐 18.04  |
-| Debian | 8 | 推荐 10+ |   | Debian | 8 | 推荐 10  || Debian | 8 | 推荐 10  |   | Debian | 8 | 推荐 10  || Debian | 8 | 推荐 10  |   | Debian | 8 | 推荐 10  || Debian | 8 | 推荐 10  |   | Debian | 8 | 推荐 10  |
+| Ubuntu | 16 | 推荐 18.04+ |
+| Debian | 8 | 推荐 10+ |
 | Alpine | 3.10+ | 轻量级发行版 |
 
-###基于改进的xray-core的高性能v2board后端。 硬件要求
+### 硬件要求
 
 | 配置 | CPU | 内存 | 带宽 |
 |------|-----|------|------|
@@ -74,7 +74,7 @@ A high-performance v2board backend based on modified xray-core.基于改进的xr
 
 - x86_64 (amd64) - 推荐(其余版本请自行构建）
 - ARM64 (aarch64)
-- s390x   ——s390x   - s390x   ——s390x
+- s390x
 
 ---
 
@@ -82,14 +82,14 @@ A high-performance v2board backend based on modified xray-core.基于改进的xr
 
 ### 方法一：一键安装
 
-```bash   ”“bash
+```bash
 wget -N https://raw.githubusercontent.com/Mcloud136/v2node/master/script/install.sh && bash install.sh
 ```
 
 **带参数安装**（跳过交互）：
 
-```bash   ”“bash
-wget -N https://raw.githubusercontent.com/Mcloud136/v2node/master/script/install.sh && \wget -N https://raw.githubusercontent.com/Mcloud136/v2node/master/script/install.sh &；
+```bash
+wget -N https://raw.githubusercontent.com/Mcloud136/v2node/master/script/install.sh && \
 bash install.sh --api-host https://your-panel.com/ --node-id 1 --api-key your-secret-key
 ```
 
@@ -379,9 +379,7 @@ HTTPS 配置在 V2board 面板中完成，节点会自动获取证书配置。
 - 修复流量计数器超时参数传递问题
 - 更新 Go 版本为 1.26.2，修复构建兼容性
 - 添加 cloudflared 服务联动重启
-  
-  
-  
+
 ### v1.0.0
 - 优化并发性能和配置验证
 - 支持配置热更新

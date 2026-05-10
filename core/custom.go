@@ -101,13 +101,13 @@ func GetCustomConfig(infos []*panel.NodeInfo) (*dns.Config, []*core.OutboundHand
 	if !hasPublicIPv6() {
 		queryStrategy = "UseIPv4"
 	}
-	
+
 	// 预计算总路由数量，用于容量预分配
 	totalRoutes := 0
 	for _, info := range infos {
 		totalRoutes += len(info.Common.Routes)
 	}
-	
+
 	coreDnsConfig := &coreConf.DNSConfig{
 		Servers: make([]*coreConf.NameServerConfig, 0, 1+totalRoutes/4),
 	}
@@ -118,7 +118,7 @@ func GetCustomConfig(infos []*panel.NodeInfo) (*dns.Config, []*core.OutboundHand
 		},
 	})
 	coreDnsConfig.QueryStrategy = queryStrategy
-	
+
 	//outbound
 	defaultoutbound, _ := buildDefaultOutbound()
 	coreOutboundConfig := make([]*core.OutboundHandlerConfig, 0, 3+totalRoutes/4)

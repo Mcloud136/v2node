@@ -175,7 +175,7 @@ func (c *Client) GetNodeInfo(ctx context.Context) (node *NodeInfo, err error) {
 	tagBuilder.WriteString(":")
 	tagBuilder.WriteString(strconv.Itoa(node.Id))
 	node.Tag = tagBuilder.String()
-	
+
 	cf := cm.TlsSettings.CertFile
 	kf := cm.TlsSettings.KeyFile
 	if cf == "" {
