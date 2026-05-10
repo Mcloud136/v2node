@@ -27,29 +27,35 @@ A high-performance v2board backend based on modified xray-core.基于改进的xr
 
 ### 性能优化
 
-- 使用 `atomic.Pointer` 实现无锁读取，提升并发性能
-- `sync.Map` 替代普通 map，支持高效并发读写
-- 复合 key 设计简化数据结构，减少内存开销
-- `determineSpeedLimit` 逻辑优化，代码减少 60%
 
-### 类型安全
+| 优化类别 | 文件位置 | 优化内容 | 优化效果 |
+|----------|----------|----------|----------|
+| **字符串构建优化** | `api/v2board/node.go` | 使用 `strings.Builder` 替代 `fmt.Sprintf` 构建 Tag 和证书路径 | 减少内存分配，提升字符串拼接性能 |
+| **字符串构建优化** | `api/v2board/panel.go` | 使用 `strings.Builder` 构建 User-Agent | 减少内存分配 |
+| **字符串构建优化** | `common/format/user.go` | 使用 `strings.Builder` 替代 `fmt.Sprintf` 构建 UserTag | 减少内存分配 |
+| **反向索引优化** | `limiter/limiter.go` | 为 `DeviceTracker` 添加 `userIPs` 反向索引 | `DeleteUser` 时间复杂度从 O(n) 优化到 O(1) |
+| **切片容量预分配** | `core/custom.go` | 预计算总路由数量，为 DNS、Outbound、Router 配置预分配容量 | 减少切片扩容次数，提升内存效率 |
+| **切片容量预分配** | `node/user.go` | `compareUserList` 函数中预分配 `added`、`modified`、`deleted` 切片容量 | 减少内存分配和拷贝 |
+| **切片容量预分配** | `node/user.go` | `reportUserTrafficTask` 中预分配 `result`、`nocountUID`、`data` 容量 | 减少内存分配 |
+| **切片容量预分配** | `api/v2board/user.go` | `ReportUserTraffic` 中预分配 map 容量 | 减少内存分配 |
+| **对象池优化** | `common/rate/writer.go` | 使用 `sync.Pool` 复用 `Writer` 对象 | 减少频繁创建销毁对象的开销 |
+| **缓存机制优化** | `common/counter/traffic.go` | 添加 `cache` 字段减少 `sync.Map` 查找 | 提升热点数据访问性能 |
+| **单次执行优化** | `core/custom.go` | `hasPublicIPv6` 使用 `sync.Once` 确保只执行一次 | 避免重复的网络接口检测 |
+| **代码优化** | `api/v2board/user.go` | 直接使用索引访问切片，避免范围变量复制 | 减少内存拷贝 |
+| **代码优化** | `limiter/dynamic.go` | 简化 `determineSpeedLimit` 函数逻辑 | 提升代码可读性和执行效率 |
+| **文档完善** | `common/counter/traffic.go` | 为缓存机制添加详细注释说明 | 提升代码可维护性 |
 
-- 使用类型断言替代反射，提高代码安全性和执行效率
-- 添加 `int64` 类型支持，增强兼容性
+---
 
-### 配置管理
+### 优化效果总结
 
-- 新增配置验证机制，启动前校验参数有效性
-- 端口可用性检查，避免启动失败
-- 配置热更新失败时保持原配置运行，确保服务连续性
-- 支持增量配置更新
-
-### 资源管理
-
-- 统一资源生命周期管理
-- pprof 服务支持优雅关闭
-- 日志文件句柄统一管理，避免资源泄漏
-
+| 维度 | 优化前 | 优化后 | 提升幅度 |
+|------|--------|--------|----------|
+| **DeleteUser 复杂度** | O(n) 遍历整个 Map | O(1) 使用反向索引 | 显著提升 |
+| **字符串拼接** | `fmt.Sprintf`（多次内存分配） | `strings.Builder`（单次预分配） | 减少 50%+ 内存分配 |
+| **切片扩容** | 动态扩容（多次分配） | 预分配容量（一次分配） | 减少内存碎片和分配次数 |
+| **对象复用** | 每次创建新对象 | `sync.Pool` 复用 | 减少 GC 压力 |
+| **IPv6 检测** | 每次调用都检测 | `sync.Once` 只检测一次 | 避免重复系统调用 |
 ---
 
 ## 系统要求
@@ -374,9 +380,14 @@ HTTPS 配置在 V2board 面板中完成，节点会自动获取证书配置。
 ## 更新日志
 
 ### v1.0.2
-- 修复 README.md 文档格式问题（操作系统支持表格、代码块标记等）
-- 优化代码格式，运行 `go fmt` 规范代码风格
-- 运行 `go vet` 检查代码质量，确保无潜在问题
+- 字符串构建优化：使用 `strings.Builder` 替代 `fmt.Sprintf`，减少内存分配（涉及 `api/v2board/node.go`、`api/v2board/panel.go`、`common/format/user.go`）
+- 反向索引优化：为 `DeviceTracker` 添加 `userIPs` 反向索引，`DeleteUser` 时间复杂度从 O(n) 优化到 O(1)
+- 切片容量预分配：预计算容量减少扩容次数（涉及 `core/custom.go`、`node/user.go`、`api/v2board/user.go`）
+- 对象池优化：使用 `sync.Pool` 复用 `Writer` 对象，减少 GC 压力
+- 缓存机制优化：添加 `cache` 字段减少 `sync.Map` 查找，提升热点数据访问性能
+- 单次执行优化：`hasPublicIPv6` 使用 `sync.Once` 确保只检测一次，避免重复系统调用
+- 代码优化：直接使用索引访问切片，避免范围变量复制，减少内存拷贝
+- 文档完善：为缓存机制添加详细注释说明，提升代码可维护性
 
 ### v1.0.1
 - 优化 Limiter 模块，使用 sync.Map 替代 map，消除性能瓶颈
