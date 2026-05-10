@@ -373,6 +373,11 @@ HTTPS 配置在 V2board 面板中完成，节点会自动获取证书配置。
 
 ## 更新日志
 
+### v1.0.2
+- 修复 README.md 文档格式问题（操作系统支持表格、代码块标记等）
+- 优化代码格式，运行 `go fmt` 规范代码风格
+- 运行 `go vet` 检查代码质量，确保无潜在问题
+
 ### v1.0.1
 - 优化 Limiter 模块，使用 sync.Map 替代 map，消除性能瓶颈
 - 用户管理 Context 复用，减少内存分配和 GC 压力
@@ -390,7 +395,7 @@ HTTPS 配置在 V2board 面板中完成，节点会自动获取证书配置。
 ## 构建
 
 ```bash
-GOEXPERIMENT=jsonv2 go build -v -o build_assets/v2node -trimpath -ldflags "-X 'github.com/Mcloud136/v2node/cmd.version=1.0.0' -s -w -buildid="
+GOEXPERIMENT=jsonv2 go build -v -o build_assets/v2node -trimpath -ldflags "-X 'github.com/Mcloud136/v2node/cmd.version=1.0.2' -s -w -buildid="
 ```
 
 ---
