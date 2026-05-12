@@ -16,7 +16,7 @@ A high-performance v2board backend based on modified xray-core.基于改进的xr
 
 ## 原版特性
 
-- 支持多种协议：VLESS、VMESS、Trojan、Shadowsocks、Hysteria2、TUIC、AnyTLS
+- 支持多种协议
 - 高性能并发设计，支持高负载场景
 - 完善的流量限制和设备管理
 - 自动证书管理和更新
@@ -340,20 +340,6 @@ v2node server --help            # 显示帮助
 ```bash
 v2node version
 ```
-
----
-
-## 支持的协议
-
-| 协议 | 状态 | 说明 |
-|------|------|------|
-| VLESS | ✅ 支持 | 推荐使用 |
-| VMESS | ✅ 支持 | 经典协议 |
-| Trojan | ✅ 支持 | 伪装能力强 |
-| Shadowsocks | ✅ 支持 | 传统协议 |
-| Hysteria2 | ✅ 支持 | 高性能UDP协议 |
-| TUIC | ✅ 支持 | QUIC协议 |
-| AnyTLS | ✅ 支持 | TLS伪装 |
 
 ---
 
