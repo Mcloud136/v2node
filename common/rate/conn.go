@@ -19,8 +19,11 @@ type Conn struct {
 }
 
 func (c *Conn) Read(b []byte) (n int, err error) {
-	c.limiter.Wait(int64(len(b)))
-	return c.Conn.Read(b)
+	n, err = c.Conn.Read(b)
+	if n > 0 {
+		c.limiter.Wait(int64(n))
+	}
+	return
 }
 
 func (c *Conn) Write(b []byte) (n int, err error) {

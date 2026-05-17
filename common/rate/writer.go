@@ -61,7 +61,17 @@ func (w *Writer) Close() error {
 func (w *Writer) WriteMultiBuffer(mb buf.MultiBuffer) error {
 	limiter := w.limiter.Get()
 	if limiter != nil {
-		limiter.Wait(int64(mb.Len()))
+		remaining := int64(mb.Len())
+		for remaining > 0 {
+			taken := limiter.TakeAvailable(remaining)
+			if taken > 0 {
+				remaining -= taken
+				continue
+			}
+			// 无可用 token，等待一个 token 恢复后再重试
+			limiter.Wait(1)
+			remaining--
+		}
 	}
 	return w.writer.WriteMultiBuffer(mb)
 }

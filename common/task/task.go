@@ -67,6 +67,7 @@ func (t *Task) ExecuteWithTimeout() error {
 
 	select {
 	case <-ctx.Done():
+		// cancel() 已在 defer 中调用，内层 goroutine 会收到 context 取消信号
 		log.Errorf("Task %s execution timed out, reloading", t.Name)
 		if t.ReloadCh != nil {
 			select {
@@ -74,7 +75,7 @@ func (t *Task) ExecuteWithTimeout() error {
 			default:
 			}
 		} else {
-			log.Panic("Reload failed")
+			log.Error("Reload channel is nil, cannot trigger reload")
 		}
 		return nil
 	case err := <-done:

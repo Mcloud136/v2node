@@ -72,26 +72,48 @@ func New(nodes []conf.NodeConfig) (*Node, error) {
 }
 
 func (n *Node) Start(nodes []conf.NodeConfig, core *core.V2Core) error {
-	for i, node := range nodes {
-		err := n.controllers[i].Start(core)
-		if err != nil {
+	// 并行启动所有 controller，减少多节点启动时间
+	type startResult struct {
+		index int
+		err   error
+	}
+	results := make(chan startResult, len(nodes))
+	var wg sync.WaitGroup
+	for i := range nodes {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			err := n.controllers[idx].Start(core)
+			results <- startResult{index: idx, err: err}
+		}(i)
+	}
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+	for r := range results {
+		if r.err != nil {
 			return fmt.Errorf("start node controller [%s-%d] error: %s",
-				node.APIHost,
-				node.NodeID,
-				err)
+				nodes[r.index].APIHost,
+				nodes[r.index].NodeID,
+				r.err)
 		}
 	}
 	return nil
 }
 
 func (n *Node) Close() error {
-	var err error
-	for _, c := range n.controllers {
-		if err = c.Close(); err != nil {
-			log.Errorf("close controller failed: %v", err)
-			return err
+	// 关闭所有 controller，即使某个失败也继续关闭其余的
+	var errs []error
+	for i, c := range n.controllers {
+		if err := c.Close(); err != nil {
+			log.Errorf("close controller [%d] failed: %v", i, err)
+			errs = append(errs, err)
 		}
 	}
 	n.controllers = nil
+	if len(errs) > 0 {
+		return fmt.Errorf("close errors: %v", errs)
+	}
 	return nil
 }

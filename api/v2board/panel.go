@@ -2,6 +2,7 @@ package panel
 
 import (
 	"errors"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -24,10 +25,17 @@ type Client struct {
 	responseBodyHash string
 	UserList         *UserListBody
 	AliveMap         *AliveMap
+	reportBuffer     map[int][]int64 // 复用的流量上报缓冲区
 }
 
 func New(c *conf.NodeConfig) (*Client, error) {
 	client := resty.New()
+	// 优化 HTTP 连接池配置，保持长连接复用
+	client.SetTransport(&http.Transport{
+		MaxIdleConns:        10,
+		MaxIdleConnsPerHost: 10,
+		IdleConnTimeout:     90 * time.Second,
+	})
 	retryCount := conf.DefaultNodeRetryCount
 	if c.RetryCount != nil {
 		retryCount = *c.RetryCount

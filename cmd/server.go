@@ -8,7 +8,6 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
-	"runtime"
 	"syscall"
 	"time"
 
@@ -210,22 +209,20 @@ func serverHandle(_ *cobra.Command, _ []string) {
 		}
 	}
 
-	runtime.GC()
-
 	osSignals := make(chan os.Signal, 1)
 	signal.Notify(osSignals, syscall.SIGINT, syscall.SIGTERM)
 
 	for {
 		select {
 		case <-osSignals:
-			log.Info("收到退出信号，正在关闭程序...")
+			log.Info("Received shutdown signal, closing...")
 			return
 		case <-reloadCh:
-			log.Info("收到重启信号，正在重新加载配置...")
+			log.Info("Received reload signal, reloading configuration...")
 			if err := reload(config, &nodes, &v2core, &resources); err != nil {
-				log.WithField("err", err).Error("重启失败，保持原有配置运行")
+				log.WithField("err", err).Error("Reload failed, keeping current configuration")
 			} else {
-				log.Info("重启成功")
+				log.Info("Reload successful")
 			}
 		}
 	}
@@ -316,6 +313,5 @@ func reload(configPath string, nodes **node.Node, v2core **core.V2Core, resource
 	*nodes = newNodes
 	*v2core = newCore
 
-	runtime.GC()
 	return nil
 }

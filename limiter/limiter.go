@@ -34,23 +34,30 @@ type UserLimitInfo struct {
 	OverLimit         bool
 }
 
+// DeviceTracker 使用单个 RWMutex 保护所有设备追踪状态
+// 替代原先 4 个 sync.Map，减少每连接 4-5 次 sync.Map 操作为 1 次 RLock/RUnlock
 type DeviceTracker struct {
-	onlineIPs  sync.Map // Key: taguuid:ip -> uid
-	oldOnline  sync.Map // Key: ip -> uid
-	aliveCount sync.Map // Key: uid -> count
-	userIPs    sync.Map // Key: taguuid -> map[string]struct{} (反向索引，用户的IP列表)
+	mu          sync.RWMutex
+	onlineIPs   map[string]int      // taguuid:ip → uid
+	oldOnline   map[string]int      // ip → uid
+	aliveCount  map[int]int         // uid → count
+	userIPs     map[string]map[string]struct{} // taguuid → IP集合 (反向索引)
 }
 
 func NewDeviceTracker(aliveList map[int]int) *DeviceTracker {
-	dt := &DeviceTracker{}
-	for uid, ip := range aliveList {
-		dt.aliveCount.Store(uid, ip)
+	dt := &DeviceTracker{
+		onlineIPs:  make(map[string]int),
+		oldOnline:  make(map[string]int),
+		aliveCount: make(map[int]int, len(aliveList)),
+		userIPs:    make(map[string]map[string]struct{}),
+	}
+	for uid, count := range aliveList {
+		dt.aliveCount[uid] = count
 	}
 	return dt
 }
 
 func (dt *DeviceTracker) TrackDevice(taguuid, ip string, uid, deviceLimit int) bool {
-	// 使用 strings.Builder 构建 key，减少字符串拼接
 	var key strings.Builder
 	key.Grow(len(taguuid) + 1 + len(ip))
 	key.WriteString(taguuid)
@@ -58,117 +65,110 @@ func (dt *DeviceTracker) TrackDevice(taguuid, ip string, uid, deviceLimit int) b
 	key.WriteString(ip)
 	keyStr := key.String()
 
-	if existingUID, loaded := dt.onlineIPs.LoadOrStore(keyStr, uid); loaded {
-		return existingUID.(int) != uid
+	dt.mu.Lock()
+	defer dt.mu.Unlock()
+
+	if existingUID, loaded := dt.onlineIPs[keyStr]; loaded {
+		return existingUID != uid
 	}
 
+	dt.onlineIPs[keyStr] = uid
+
 	// 维护反向索引
-	if ipMapVal, ok := dt.userIPs.Load(taguuid); ok {
-		ipMap := ipMapVal.(map[string]struct{})
-		ipMap[ip] = struct{}{}
+	if ips, ok := dt.userIPs[taguuid]; ok {
+		ips[ip] = struct{}{}
 	} else {
-		newIPMap := make(map[string]struct{})
-		newIPMap[ip] = struct{}{}
-		dt.userIPs.Store(taguuid, newIPMap)
+		dt.userIPs[taguuid] = map[string]struct{}{ip: {}}
 	}
 
 	if deviceLimit > 0 {
-		countVal, _ := dt.aliveCount.Load(uid)
-		count := 0
-		if countVal != nil {
-			count = countVal.(int)
-		}
+		count := dt.aliveCount[uid]
 		if count >= deviceLimit {
-			dt.onlineIPs.Delete(keyStr)
+			delete(dt.onlineIPs, keyStr)
 			// 同时清理反向索引
-			if ipMapVal, ok := dt.userIPs.Load(taguuid); ok {
-				ipMap := ipMapVal.(map[string]struct{})
-				delete(ipMap, ip)
-				if len(ipMap) == 0 {
-					dt.userIPs.Delete(taguuid)
+			if ips, ok := dt.userIPs[taguuid]; ok {
+				delete(ips, ip)
+				if len(ips) == 0 {
+					delete(dt.userIPs, taguuid)
 				}
 			}
 			return true
 		}
 	}
 
-	if oldUID, ok := dt.oldOnline.Load(ip); ok && oldUID.(int) == uid {
-		dt.oldOnline.Delete(ip)
+	if oldUID, ok := dt.oldOnline[ip]; ok && oldUID == uid {
+		delete(dt.oldOnline, ip)
 	}
 
 	return false
 }
 
 func (dt *DeviceTracker) UpdateAliveList(newAlive map[int]int) {
-	existing := make(map[int]struct{})
-	dt.aliveCount.Range(func(key, _ interface{}) bool {
-		existing[key.(int)] = struct{}{}
-		return true
-	})
+	dt.mu.Lock()
+	defer dt.mu.Unlock()
 
-	for uid := range existing {
+	for uid := range dt.aliveCount {
 		if _, exists := newAlive[uid]; !exists {
-			dt.aliveCount.Delete(uid)
+			delete(dt.aliveCount, uid)
 		}
 	}
 
 	for uid, count := range newAlive {
-		dt.aliveCount.Store(uid, count)
+		dt.aliveCount[uid] = count
 	}
 }
 
 func (dt *DeviceTracker) GetOnlineDevices() []panel.OnlineUser {
-	result := make([]panel.OnlineUser, 0, 64)
+	dt.mu.Lock()
+	defer dt.mu.Unlock()
 
-	dt.oldOnline.Range(func(key, value interface{}) bool {
-		dt.oldOnline.Delete(key)
-		return true
-	})
+	result := make([]panel.OnlineUser, 0, len(dt.onlineIPs))
 
-	toDelete := make([]string, 0, 64)
-	dt.onlineIPs.Range(func(key, value interface{}) bool {
-		toDelete = append(toDelete, key.(string))
-		return true
-	})
+	// 清空 oldOnline
+	for k := range dt.oldOnline {
+		delete(dt.oldOnline, k)
+	}
 
-	for _, ipKey := range toDelete {
-		if uidVal, ok := dt.onlineIPs.LoadAndDelete(ipKey); ok {
-			uid := uidVal.(int)
-			colonIndex := strings.LastIndex(ipKey, ":")
-			taguuid := ipKey[:colonIndex]
-			ip := ipKey[colonIndex+1:]
-			dt.oldOnline.Store(ip, uid)
-			result = append(result, panel.OnlineUser{UID: uid, IP: ip})
+	// 收集并迁移 onlineIPs 到 oldOnline
+	for ipKey, uid := range dt.onlineIPs {
+		colonIndex := strings.LastIndex(ipKey, ":")
+		taguuid := ipKey[:colonIndex]
+		ip := ipKey[colonIndex+1:]
+		dt.oldOnline[ip] = uid
+		result = append(result, panel.OnlineUser{UID: uid, IP: ip})
 
-			// 清理反向索引
-			if ipMapVal, ok := dt.userIPs.Load(taguuid); ok {
-				ipMap := ipMapVal.(map[string]struct{})
-				delete(ipMap, ip)
-				if len(ipMap) == 0 {
-					dt.userIPs.Delete(taguuid)
-				}
+		// 清理反向索引
+		if ips, ok := dt.userIPs[taguuid]; ok {
+			delete(ips, ip)
+			if len(ips) == 0 {
+				delete(dt.userIPs, taguuid)
 			}
 		}
+	}
+
+	// 清空 onlineIPs
+	for k := range dt.onlineIPs {
+		delete(dt.onlineIPs, k)
 	}
 
 	return result
 }
 
 func (dt *DeviceTracker) DeleteUser(taguuid string) {
+	dt.mu.Lock()
+	defer dt.mu.Unlock()
+
 	// 使用反向索引快速删除，避免遍历整个 Map
-	if ipMapVal, ok := dt.userIPs.Load(taguuid); ok {
-		ipMap := ipMapVal.(map[string]struct{})
-		// 预构建完整的 key 并删除
-		for ip := range ipMap {
+	if ips, ok := dt.userIPs[taguuid]; ok {
+		for ip := range ips {
 			var key strings.Builder
 			key.Grow(len(taguuid) + 1 + len(ip))
 			key.WriteString(taguuid)
 			key.WriteByte(':')
 			key.WriteString(ip)
-			dt.onlineIPs.Delete(key.String())
+			delete(dt.onlineIPs, key.String())
 		}
-		// 清理反向索引
-		dt.userIPs.Delete(taguuid)
+		delete(dt.userIPs, taguuid)
 	}
 }
 
@@ -311,8 +311,8 @@ func (l *Limiter) getOrCreateSpeedLimiter(taguuid string, nodeLimit, userLimit i
 	}
 
 	d := rate.NewDynamicBucket(limit)
-	l.SpeedLimiter.Store(taguuid, d)
-	return d, false
+	actual, _ := l.SpeedLimiter.LoadOrStore(taguuid, d)
+	return actual.(*rate.DynamicBucket), false
 }
 
 func (l *Limiter) UpdateAliveList(newAlive map[int]int) {

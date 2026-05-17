@@ -191,15 +191,9 @@ func (d *DefaultDispatcher) getLink(ctx context.Context) (*transport.Link, *tran
 			return nil, nil, nil, errors.New("Limited ", user.Email, " by conn or ip")
 		}
 		// 优化 LinkManagers 的加载
-		var lm *LinkManager
-		if lmVal, ok := d.LinkManagers.Load(user.Email); ok {
-			lm = lmVal.(*LinkManager)
-		} else {
-			lm = &LinkManager{
-				links: make(map[*ManagedWriter]buf.Reader),
-			}
-			d.LinkManagers.Store(user.Email, lm)
-		}
+		newLM := &LinkManager{links: make(map[*ManagedWriter]buf.Reader)}
+		lmVal, _ := d.LinkManagers.LoadOrStore(user.Email, newLM)
+		lm := lmVal.(*LinkManager)
 		managedWriter := &ManagedWriter{
 			writer:  uplinkWriter,
 			manager: lm,
@@ -212,13 +206,9 @@ func (d *DefaultDispatcher) getLink(ctx context.Context) (*transport.Link, *tran
 			outboundLink.Writer = rate.NewRateLimitWriter(outboundLink.Writer, w)
 		}
 		// 优化 Counter 的加载
-		var t *counter.TrafficCounter
-		if counterVal, ok := d.Counter.Load(sessionInbound.Tag); ok {
-			t = counterVal.(*counter.TrafficCounter)
-		} else {
-			t = counter.NewTrafficCounter()
-			d.Counter.Store(sessionInbound.Tag, t)
-		}
+		newCounter := counter.NewTrafficCounter()
+		counterVal, _ := d.Counter.LoadOrStore(sessionInbound.Tag, newCounter)
+		t := counterVal.(*counter.TrafficCounter)
 		ts := t.GetCounter(user.Email)
 		upcounter := &counter.XrayTrafficCounter{V: &ts.UpCounter}
 		downcounter := &counter.XrayTrafficCounter{V: &ts.DownCounter}
@@ -367,15 +357,9 @@ func (d *DefaultDispatcher) DispatchLink(ctx context.Context, destination net.De
 			common.Interrupt(outbound.Reader)
 			return errors.New("Limited ", user.Email, " by conn or ip")
 		}
-		var lm *LinkManager
-		if lmloaded, ok := d.LinkManagers.Load(user.Email); !ok {
-			lm = &LinkManager{
-				links: make(map[*ManagedWriter]buf.Reader),
-			}
-			d.LinkManagers.Store(user.Email, lm)
-		} else {
-			lm = lmloaded.(*LinkManager)
-		}
+		newLM := &LinkManager{links: make(map[*ManagedWriter]buf.Reader)}
+		lmVal, _ := d.LinkManagers.LoadOrStore(user.Email, newLM)
+		lm := lmVal.(*LinkManager)
 		managedWriter := &ManagedWriter{
 			writer:  outbound.Writer,
 			manager: lm,
@@ -385,13 +369,9 @@ func (d *DefaultDispatcher) DispatchLink(ctx context.Context, destination net.De
 			sessionInbound.CanSpliceCopy = 3
 			outbound.Writer = rate.NewRateLimitWriter(outbound.Writer, w)
 		}
-		var t *counter.TrafficCounter
-		if c, ok := d.Counter.Load(sessionInbound.Tag); !ok {
-			t = counter.NewTrafficCounter()
-			d.Counter.Store(sessionInbound.Tag, t)
-		} else {
-			t = c.(*counter.TrafficCounter)
-		}
+		newCounter := counter.NewTrafficCounter()
+		counterVal, _ := d.Counter.LoadOrStore(sessionInbound.Tag, newCounter)
+		t := counterVal.(*counter.TrafficCounter)
 
 		ts := t.GetCounter(user.Email)
 		downcounter := &counter.XrayTrafficCounter{V: &ts.DownCounter}
@@ -443,7 +423,7 @@ func (d *DefaultDispatcher) DispatchLink(ctx context.Context, destination net.De
 }
 
 func sniffer(ctx context.Context, cReader *cachedReader, metadataOnly bool, network net.Network) (SniffResult, error) {
-	payload := buf.NewWithSize(32767)
+	payload := buf.NewWithSize(4096)
 	defer payload.Release()
 
 	sniffer := NewSniffer(ctx)
@@ -557,12 +537,20 @@ func (d *DefaultDispatcher) routedDispatch(ctx context.Context, link *transport.
 		if tag := handler.Tag(); tag != "" {
 			if inTag == "" {
 				accessMessage.Detour = tag
-			} else if isPickRoute == 1 {
-				accessMessage.Detour = inTag + " ==> " + tag
-			} else if isPickRoute == 2 {
-				accessMessage.Detour = inTag + " -> " + tag
 			} else {
-				accessMessage.Detour = inTag + " >> " + tag
+				var sb strings.Builder
+				sb.Grow(len(inTag) + 5 + len(tag))
+				sb.WriteString(inTag)
+				switch isPickRoute {
+				case 1:
+					sb.WriteString(" ==> ")
+				case 2:
+					sb.WriteString(" -> ")
+				default:
+					sb.WriteString(" >> ")
+				}
+				sb.WriteString(tag)
+				accessMessage.Detour = sb.String()
 			}
 		}
 		log.Record(accessMessage)
