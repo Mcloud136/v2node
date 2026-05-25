@@ -10,9 +10,9 @@ A high-performance v2board backend based on modified xray-core.基于改进的xr
 
 ## 项目简介
 
-本项目基于[xiao佬的v2node](https://github.com/wyx2685/v2node)制作，大幅度提升性能并加入一些新的特性。
+本项目基于[https://github.com/wyx2685/v2node](https://github.com/wyx2685/v2node)制作，大幅度提升性能并加入一些新的特性。
 
-**注意**：本项目和[xiao佬的v2node](https://github.com/wyx2685/v2node)一样，需要搭配[修改版 V2board](https://github.com/wyx2685/v2board) 使用。
+**注意**：本项目和[https://github.com/wyx2685/v2node](https://github.com/wyx2685/v2node)一样，需要搭配[修改版 V2board](https://github.com/Mcloud136/v2board) 使用。
 
 ## 原版特性
 
