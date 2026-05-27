@@ -38,8 +38,8 @@ jobs:
           languages: ${{ matrix.language }}
           upload: false
 
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@v4
+      - name: Build
+        run: go build ./...
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
