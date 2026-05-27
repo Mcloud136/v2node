@@ -32,6 +32,7 @@ type UserLimitInfo struct {
 	DynamicSpeedLimit int
 	ExpireTime        int64
 	OverLimit         bool
+	mu                sync.RWMutex
 }
 
 // DeviceTracker 使用单个 RWMutex 保护所有设备追踪状态
@@ -65,9 +66,19 @@ func (dt *DeviceTracker) TrackDevice(taguuid, ip string, uid, deviceLimit int) b
 	key.WriteString(ip)
 	keyStr := key.String()
 
+	// 快速路径：只读检查（RLock 允许并发读取）
+	dt.mu.RLock()
+	if existingUID, loaded := dt.onlineIPs[keyStr]; loaded {
+		dt.mu.RUnlock()
+		return existingUID != uid
+	}
+	dt.mu.RUnlock()
+
+	// 慢路径：需要写入，升级为独占锁
 	dt.mu.Lock()
 	defer dt.mu.Unlock()
 
+	// 再次检查（其他 goroutine 可能已插入）
 	if existingUID, loaded := dt.onlineIPs[keyStr]; loaded {
 		return existingUID != uid
 	}
@@ -218,8 +229,10 @@ func (l *Limiter) UpdateUser(tag string, added []panel.UserInfo, deleted []panel
 		taguuid := format.UserTag(tag, modified[i].Uuid)
 		if v, ok := l.UserLimit.Load(taguuid); ok {
 			u := v.(*UserLimitInfo)
+			u.mu.Lock()
 			u.SpeedLimit = modified[i].SpeedLimit
 			u.DeviceLimit = modified[i].DeviceLimit
+			u.mu.Unlock()
 		}
 		limit := int64(determineSpeedLimit(l.SpeedLimit, modified[i].SpeedLimit)) * 1000000 / 8
 		if limit > 0 {
@@ -254,8 +267,10 @@ func (l *Limiter) UpdateDynamicSpeedLimit(tag, uuid string, limit int, expire ti
 	taguuid := format.UserTag(tag, uuid)
 	if v, ok := l.UserLimit.Load(taguuid); ok {
 		info := v.(*UserLimitInfo)
+		info.mu.Lock()
 		info.DynamicSpeedLimit = limit
 		info.ExpireTime = expire.Unix()
+		info.mu.Unlock()
 		return nil
 	}
 	return errors.New("not found")
@@ -274,21 +289,28 @@ func (l *Limiter) CheckLimit(taguuid string, ip string, noUDPsource bool) (*rate
 		return nil, true
 	}
 	u := v.(*UserLimitInfo)
+	u.mu.RLock()
 	deviceLimit = u.DeviceLimit
 	uid = u.UID
+	speedLimit := u.SpeedLimit
+	dynamicSpeedLimit := u.DynamicSpeedLimit
+	expireTime := u.ExpireTime
+	u.mu.RUnlock()
 
 	now := time.Now().Unix()
-	if u.ExpireTime != 0 && u.ExpireTime < now {
-		if u.SpeedLimit != 0 {
-			userLimit = u.SpeedLimit
+	if expireTime != 0 && expireTime < now {
+		if speedLimit != 0 {
+			userLimit = speedLimit
+			u.mu.Lock()
 			u.DynamicSpeedLimit = 0
 			u.ExpireTime = 0
+			u.mu.Unlock()
 		} else {
 			l.UserLimit.Delete(taguuid)
 			return nil, true
 		}
 	} else {
-		userLimit = determineSpeedLimit(u.SpeedLimit, u.DynamicSpeedLimit)
+		userLimit = determineSpeedLimit(speedLimit, dynamicSpeedLimit)
 	}
 
 	if noUDPsource || l.Nodetype == "hysteria2" || l.Nodetype == "tuic" {

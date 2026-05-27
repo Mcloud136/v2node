@@ -3,6 +3,7 @@ package conf
 import (
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -11,8 +12,12 @@ import (
 func (p *Conf) Watch(filePath string, reload func()) error {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		return fmt.Errorf("new watcher error: %s", err)
+		return fmt.Errorf("new watcher error: %w", err)
 	}
+
+	var reloadMu sync.Mutex
+	stopCh := make(chan struct{})
+
 	go func() {
 		var pre time.Time
 		defer watcher.Close()
@@ -27,13 +32,21 @@ func (p *Conf) Watch(filePath string, reload func()) error {
 				}
 				pre = time.Now()
 				go func() {
-					time.Sleep(5 * time.Second)
+					select {
+					case <-time.After(5 * time.Second):
+					case <-stopCh:
+						return
+					}
+					reloadMu.Lock()
+					defer reloadMu.Unlock()
 					log.Println("config file changed, reloading...")
-					*p = *New()
-					err := p.LoadFromPath(filePath)
+					newConf := New()
+					err := newConf.LoadFromPath(filePath)
 					if err != nil {
 						log.Printf("reload config error: %s", err)
+						return
 					}
+					*p = *newConf
 					reload()
 					log.Println("reload config success")
 				}()
@@ -41,12 +54,15 @@ func (p *Conf) Watch(filePath string, reload func()) error {
 				if err != nil {
 					log.Printf("File watcher error: %s", err)
 				}
+			case <-stopCh:
+				return
 			}
 		}
 	}()
+
 	err = watcher.Add(filePath)
 	if err != nil {
-		return fmt.Errorf("watch file error: %s", err)
+		return fmt.Errorf("watch file error: %w", err)
 	}
 	return nil
 }

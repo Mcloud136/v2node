@@ -74,10 +74,18 @@ func (c *Controller) requestCert() error {
 }
 
 func generateSelfSslCertificate(domain, certPath, keyPath string) error {
-	key, _ := rsa.GenerateKey(rand.Reader, 2048)
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return fmt.Errorf("generate RSA key failed: %w", err)
+	}
+	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
+	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
+	if err != nil {
+		return fmt.Errorf("generate serial number failed: %w", err)
+	}
 	tmpl := &x509.Certificate{
 		Version:      3,
-		SerialNumber: big.NewInt(time.Now().Unix()),
+		SerialNumber: serialNumber,
 		Subject: pkix.Name{
 			CommonName: domain,
 		},
@@ -92,27 +100,25 @@ func generateSelfSslCertificate(domain, certPath, keyPath string) error {
 	if err != nil {
 		return err
 	}
-	f, err := os.OpenFile(certPath, os.O_CREATE|os.O_RDWR, 0644)
+	certFile, err := os.OpenFile(certPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
 	}
-	err = pem.Encode(f, &pem.Block{
+	defer certFile.Close()
+	if err := pem.Encode(certFile, &pem.Block{
 		Type:  "CERTIFICATE",
 		Bytes: cert,
-	})
+	}); err != nil {
+		return err
+	}
+
+	keyFile, err := os.OpenFile(keyPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
 	if err != nil {
 		return err
 	}
-	f, err = os.OpenFile(keyPath, os.O_CREATE|os.O_RDWR, 0644)
-	if err != nil {
-		return err
-	}
-	err = pem.Encode(f, &pem.Block{
-		Type:  "EC PRIVATE KEY",
+	defer keyFile.Close()
+	return pem.Encode(keyFile, &pem.Block{
+		Type:  "RSA PRIVATE KEY",
 		Bytes: x509.MarshalPKCS1PrivateKey(key),
 	})
-	if err != nil {
-		return err
-	}
-	return nil
 }

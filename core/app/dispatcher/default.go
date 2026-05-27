@@ -39,6 +39,10 @@ type cachedReader struct {
 	cache  buf.MultiBuffer
 }
 
+// maxSniffCacheSize caps the accumulated sniffing cache to 64 KB so that a
+// slow downstream consumer cannot cause unbounded memory growth.
+const maxSniffCacheSize = 64 * 1024
+
 func (r *cachedReader) Cache(b *buf.Buffer, deadline time.Duration) error {
 	mb, err := r.reader.ReadMultiBufferTimeout(deadline)
 	if err != nil {
@@ -47,6 +51,17 @@ func (r *cachedReader) Cache(b *buf.Buffer, deadline time.Duration) error {
 	r.Lock()
 	if !mb.IsEmpty() {
 		r.cache, _ = buf.MergeMulti(r.cache, mb)
+	}
+	// Prevent unbounded cache growth: if the cache exceeds the limit,
+	// release the incoming buffer and return the capped view.
+	if r.cache != nil && r.cache.Len() > maxSniffCacheSize {
+		b.Clear()
+		rawBytes := b.Extend(min(maxSniffCacheSize, b.Cap()))
+		n := r.cache.Copy(rawBytes)
+		b.Resize(0, int32(n))
+		r.cache = buf.ReleaseMulti(r.cache)
+		r.Unlock()
+		return nil
 	}
 	b.Clear()
 	rawBytes := b.Extend(min(r.cache.Len(), b.Cap()))
@@ -190,10 +205,15 @@ func (d *DefaultDispatcher) getLink(ctx context.Context) (*transport.Link, *tran
 			common.Interrupt(inboundLink.Reader)
 			return nil, nil, nil, errors.New("Limited ", user.Email, " by conn or ip")
 		}
-		// 优化 LinkManagers 的加载
-		newLM := &LinkManager{links: make(map[*ManagedWriter]buf.Reader)}
-		lmVal, _ := d.LinkManagers.LoadOrStore(user.Email, newLM)
-		lm := lmVal.(*LinkManager)
+		// 优化 LinkManagers 的加载（double-check 避免无用分配）
+		var lm *LinkManager
+		if v, ok := d.LinkManagers.Load(user.Email); ok {
+			lm = v.(*LinkManager)
+		} else {
+			newLM := &LinkManager{links: make(map[*ManagedWriter]buf.Reader)}
+			actual, _ := d.LinkManagers.LoadOrStore(user.Email, newLM)
+			lm = actual.(*LinkManager)
+		}
 		managedWriter := &ManagedWriter{
 			writer:  uplinkWriter,
 			manager: lm,
@@ -205,10 +225,15 @@ func (d *DefaultDispatcher) getLink(ctx context.Context) (*transport.Link, *tran
 			inboundLink.Writer = rate.NewRateLimitWriter(inboundLink.Writer, w)
 			outboundLink.Writer = rate.NewRateLimitWriter(outboundLink.Writer, w)
 		}
-		// 优化 Counter 的加载
-		newCounter := counter.NewTrafficCounter()
-		counterVal, _ := d.Counter.LoadOrStore(sessionInbound.Tag, newCounter)
-		t := counterVal.(*counter.TrafficCounter)
+		// 优化 Counter 的加载（double-check 避免无用分配）
+		var t *counter.TrafficCounter
+		if v, ok := d.Counter.Load(sessionInbound.Tag); ok {
+			t = v.(*counter.TrafficCounter)
+		} else {
+			newCounter := counter.NewTrafficCounter()
+			actual, _ := d.Counter.LoadOrStore(sessionInbound.Tag, newCounter)
+			t = actual.(*counter.TrafficCounter)
+		}
 		ts := t.GetCounter(user.Email)
 		upcounter := &counter.XrayTrafficCounter{V: &ts.UpCounter}
 		downcounter := &counter.XrayTrafficCounter{V: &ts.DownCounter}

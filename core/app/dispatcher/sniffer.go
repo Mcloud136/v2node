@@ -41,18 +41,25 @@ var baseSniffers = []protocolSnifferWithMetadata{
 	{func(c context.Context, b []byte) (SniffResult, error) { return bittorrent.SniffUTP(b) }, false, net.Network_UDP},
 }
 
+// defaultSniffer is a process-wide singleton for connections that do not use
+// FakeDNS.  It is safe for concurrent use because Sniffer.Sniff never mutates
+// the sniffer slice.
+var defaultSniffer = &Sniffer{sniffer: baseSniffers}
+
 func NewSniffer(ctx context.Context) *Sniffer {
-	// 复用静态嗅探器列表，避免每连接分配
-	sniffers := make([]protocolSnifferWithMetadata, len(baseSniffers))
-	copy(sniffers, baseSniffers)
-	ret := &Sniffer{sniffer: sniffers}
-	if sniffer, err := newFakeDNSSniffer(ctx); err == nil {
-		others := ret.sniffer
-		ret.sniffer = append(ret.sniffer, sniffer)
-		fakeDNSThenOthers, err := newFakeDNSThenOthers(ctx, sniffer, others)
-		if err == nil {
-			ret.sniffer = append([]protocolSnifferWithMetadata{fakeDNSThenOthers}, ret.sniffer...)
-		}
+	// When FakeDNS is not configured, return the shared singleton to avoid
+	// per-connection allocation.
+	sniffer, err := newFakeDNSSniffer(ctx)
+	if err != nil {
+		return defaultSniffer
+	}
+	// FakeDNS is active – build a per-request Sniffer as before.
+	ret := &Sniffer{sniffer: make([]protocolSnifferWithMetadata, len(baseSniffers), len(baseSniffers)+2)}
+	copy(ret.sniffer, baseSniffers)
+	ret.sniffer = append(ret.sniffer, sniffer)
+	fakeDNSThenOthers, err := newFakeDNSThenOthers(ctx, sniffer, baseSniffers)
+	if err == nil {
+		ret.sniffer = append([]protocolSnifferWithMetadata{fakeDNSThenOthers}, ret.sniffer...)
 	}
 	return ret
 }
@@ -78,7 +85,7 @@ func (s *Sniffer) Sniff(c context.Context, payload []byte, network net.Network) 
 	}
 
 	if len(pendingSniffer) > 0 {
-		s.sniffer = pendingSniffer
+		// 不修改 s.sniffer，避免并发竞态
 		return nil, common.ErrNoClue
 	}
 
@@ -105,7 +112,7 @@ func (s *Sniffer) SniffMetadata(c context.Context) (SniffResult, error) {
 	}
 
 	if len(pendingSniffer) > 0 {
-		s.sniffer = pendingSniffer
+		// 不修改 s.sniffer，避免并发竞态
 		return nil, common.ErrNoClue
 	}
 

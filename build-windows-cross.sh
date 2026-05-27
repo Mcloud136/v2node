@@ -5,7 +5,7 @@
 
 set -e
 
-VERSION="1.0.1"
+VERSION="1.0.2"
 BUILD_DIR="$(cd "$(dirname "$0")" && pwd)"
 CC=x86_64-w64-mingw32-gcc
 CXX=x86_64-w64-mingw32-g++
@@ -17,7 +17,7 @@ echo "Building for windows/amd64..."
 CGO_ENABLED=1 GOOS=windows GOARCH=amd64 CC=$CC CXX=$CXX go build \
   -ldflags " \
     -s -w \
-    -X main.version=${VERSION} \
+    -X github.com/wyx2685/v2node/cmd.version=${VERSION} \
     -linkmode=external \
   " \
   -gcflags="all=-B -l=4" \

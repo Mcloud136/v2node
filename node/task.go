@@ -71,7 +71,7 @@ func (c *Controller) nodeInfoMonitor(ctx context.Context) (err error) {
 			default:
 			}
 		} else {
-			log.Panic("Reload failed")
+			log.Error("Reload channel is nil, cannot trigger reload")
 		}
 	}
 	log.WithField("tag", c.tag).Debug("Node info no change")

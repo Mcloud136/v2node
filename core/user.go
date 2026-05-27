@@ -29,7 +29,7 @@ func (v *V2Core) GetUserManager(tag string) (proxy.UserManager, error) {
 	defer cancel()
 	handler, err := v.ihm.GetHandler(ctx, tag)
 	if err != nil {
-		return nil, fmt.Errorf("no such inbound tag: %s", err)
+		return nil, fmt.Errorf("no such inbound tag: %w", err)
 	}
 	inboundInstance, ok := handler.(proxy.GetInbound)
 	if !ok {
@@ -45,7 +45,7 @@ func (v *V2Core) GetUserManager(tag string) (proxy.UserManager, error) {
 func (vc *V2Core) DelUsers(users []panel.UserInfo, tag string, _ *panel.NodeInfo) error {
 	userManager, err := vc.GetUserManager(tag)
 	if err != nil {
-		return fmt.Errorf("get user manager error: %s", err)
+		return fmt.Errorf("get user manager error: %w", err)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -73,7 +73,7 @@ func (vc *V2Core) DelUsers(users []panel.UserInfo, tag string, _ *panel.NodeInfo
 }
 
 func (vc *V2Core) GetUserTrafficSlice(tag string, mintraffic int) ([]panel.UserTraffic, error) {
-	trafficSlice := make([]panel.UserTraffic, 0)
+	trafficSlice := make([]panel.UserTraffic, 0, 256)
 	vc.users.mapLock.RLock()
 	defer vc.users.mapLock.RUnlock()
 	if v, ok := vc.dispatcher.Counter.Load(tag); ok {
@@ -81,11 +81,9 @@ func (vc *V2Core) GetUserTrafficSlice(tag string, mintraffic int) ([]panel.UserT
 		c.Counters.Range(func(key, value interface{}) bool {
 			email := key.(string)
 			traffic := value.(*counter.TrafficStorage)
-			up := traffic.UpCounter.Load()
-			down := traffic.DownCounter.Load()
-			if up+down > int64(mintraffic*1000) {
-				traffic.UpCounter.Store(0)
-				traffic.DownCounter.Store(0)
+			up := traffic.UpCounter.Swap(0)
+			down := traffic.DownCounter.Swap(0)
+			if up+down > int64(mintraffic)*1000 {
 				if vc.users.uidMap[email] == 0 {
 					c.Delete(email)
 					return true
@@ -133,7 +131,7 @@ func (v *V2Core) AddUsers(p *AddUsersParams) (added int, err error) {
 	}
 	man, err := v.GetUserManager(p.Tag)
 	if err != nil {
-		return 0, fmt.Errorf("get user manager error: %s", err)
+		return 0, fmt.Errorf("get user manager error: %w", err)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

@@ -5,7 +5,7 @@
 
 set -e
 
-VERSION="1.0.1"
+VERSION="1.0.2"
 BUILD_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 echo "Building v2node ${VERSION} for Linux..."
@@ -15,7 +15,7 @@ echo "Building for linux/amd64..."
 GOOS=linux GOARCH=amd64 CGO_ENABLED=1 go build \
   -ldflags " \
     -s -w \
-    -X main.version=${VERSION} \
+    -X github.com/wyx2685/v2node/cmd.version=${VERSION} \
     -linkmode=external \
   " \
   -gcflags="all=-B -l=4" \
@@ -27,7 +27,7 @@ echo "Building for linux/arm64..."
 GOOS=linux GOARCH=arm64 CGO_ENABLED=1 go build \
   -ldflags " \
     -s -w \
-    -X main.version=${VERSION} \
+    -X github.com/wyx2685/v2node/cmd.version=${VERSION} \
     -linkmode=external \
   " \
   -gcflags="all=-B -l=4" \

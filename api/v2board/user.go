@@ -8,6 +8,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/sirupsen/logrus"
 	"github.com/vmihailenco/msgpack/v5"
 )
 
@@ -93,7 +94,7 @@ func (c *Client) GetUserAlive(ctx context.Context) (map[int]int, error) {
 	}
 	defer r.RawResponse.Body.Close()
 	if err := json.Unmarshal(r.Body(), c.AliveMap); err != nil {
-		fmt.Printf("unmarshal user alive list error: %s", err)
+		logrus.WithField("err", err).Error("unmarshal user alive list error")
 		c.AliveMap.Alive = make(map[int]int)
 	}
 

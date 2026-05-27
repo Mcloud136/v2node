@@ -68,9 +68,13 @@ func (w *Writer) WriteMultiBuffer(mb buf.MultiBuffer) error {
 				remaining -= taken
 				continue
 			}
-			// 无可用 token，等待一个 token 恢复后再重试
-			limiter.Wait(1)
-			remaining--
+			// 批量等待：每次最多等待 4096 bytes 的 token，减少循环次数
+			batchSize := remaining
+			if batchSize > 4096 {
+				batchSize = 4096
+			}
+			limiter.Wait(batchSize)
+			remaining -= batchSize
 		}
 	}
 	return w.writer.WriteMultiBuffer(mb)

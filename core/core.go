@@ -67,6 +67,9 @@ func (v *V2Core) Start(infos []*panel.NodeInfo) error {
 func (v *V2Core) Close() error {
 	v.access.Lock()
 	defer v.access.Unlock()
+	if v.Server == nil {
+		return nil
+	}
 	v.Config = nil
 	v.ihm = nil
 	v.ohm = nil
@@ -105,7 +108,10 @@ func getCore(c *conf.Conf, infos []*panel.NodeInfo) *core.Instance {
 	}
 	corePolicyConfig := &coreConf.PolicyConfig{}
 	corePolicyConfig.Levels = map[uint32]*coreConf.Policy{0: levelPolicyConfig}
-	policyConfig, _ := corePolicyConfig.Build()
+	policyConfig, err := corePolicyConfig.Build()
+	if err != nil {
+		log.WithField("err", err).Panic("failed to build policy config")
+	}
 	// Build Xray conf
 	config := &core.Config{
 		App: []*serial.TypedMessage{

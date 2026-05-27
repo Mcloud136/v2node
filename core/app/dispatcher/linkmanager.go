@@ -40,8 +40,15 @@ func (m *LinkManager) RemoveWriter(writer *ManagedWriter) {
 
 func (m *LinkManager) CloseAll() {
 	m.mu.Lock()
-	defer m.mu.Unlock()
+	// 收集链接副本后释放锁，避免 ManagedWriter.Close() -> RemoveWriter() 再次加锁导致死锁
+	links := make(map[*ManagedWriter]buf.Reader, len(m.links))
 	for w, r := range m.links {
+		links[w] = r
+	}
+	m.links = make(map[*ManagedWriter]buf.Reader)
+	m.mu.Unlock()
+
+	for w, r := range links {
 		common.Close(w)
 		common.Interrupt(r)
 	}

@@ -2,6 +2,7 @@ package core
 
 import (
 	"encoding/json"
+	"fmt"
 	"net"
 	"sync"
 
@@ -120,12 +121,21 @@ func GetCustomConfig(infos []*panel.NodeInfo) (*dns.Config, []*core.OutboundHand
 	coreDnsConfig.QueryStrategy = queryStrategy
 
 	//outbound
-	defaultoutbound, _ := buildDefaultOutbound()
+	defaultoutbound, err := buildDefaultOutbound()
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("build default outbound error: %w", err)
+	}
 	coreOutboundConfig := make([]*core.OutboundHandlerConfig, 0, 3+totalRoutes/4)
 	coreOutboundConfig = append(coreOutboundConfig, defaultoutbound)
-	block, _ := buildBlockOutbound()
+	block, err := buildBlockOutbound()
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("build block outbound error: %w", err)
+	}
 	coreOutboundConfig = append(coreOutboundConfig, block)
-	dns, _ := buildDnsOutbound()
+	dns, err := buildDnsOutbound()
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("build dns outbound error: %w", err)
+	}
 	coreOutboundConfig = append(coreOutboundConfig, dns)
 
 	//route

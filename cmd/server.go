@@ -27,7 +27,7 @@ var (
 var serverCommand = cobra.Command{
 	Use:   "server",
 	Short: "Run v2node server",
-	Run:   serverHandle,
+	RunE:  serverHandle,
 	Args:  cobra.NoArgs,
 }
 
@@ -126,7 +126,7 @@ func (sr *ServerResources) Close() {
 	}
 }
 
-func serverHandle(_ *cobra.Command, _ []string) {
+func serverHandle(_ *cobra.Command, _ []string) error {
 	showVersion()
 
 	var resources ServerResources
@@ -141,12 +141,12 @@ func serverHandle(_ *cobra.Command, _ []string) {
 	})
 	if err != nil {
 		log.WithField("err", err).Error("Load config file failed")
-		return
+		return err
 	}
 
 	if err := validateConfig(c); err != nil {
 		log.WithField("err", err).Error("Config validation failed")
-		return
+		return err
 	}
 
 	setLogLevel(c.LogConfig.Level)
@@ -157,7 +157,7 @@ func serverHandle(_ *cobra.Command, _ []string) {
 	if c.PprofPort != 0 {
 		if !isPortAvailable(c.PprofPort) {
 			log.WithField("port", c.PprofPort).Error("pprof port is not available")
-			return
+			return fmt.Errorf("pprof port %d not available", c.PprofPort)
 		}
 		resources.pprofServer = &http.Server{
 			Addr: fmt.Sprintf("127.0.0.1:%d", c.PprofPort),
@@ -175,7 +175,7 @@ func serverHandle(_ *cobra.Command, _ []string) {
 	nodes, err := node.New(c.NodeConfigs)
 	if err != nil {
 		log.WithField("err", err).Error("Get node info failed")
-		return
+		return err
 	}
 	log.Info("Got nodes info from server")
 
@@ -185,14 +185,14 @@ func serverHandle(_ *cobra.Command, _ []string) {
 	err = v2core.Start(nodes.NodeInfos)
 	if err != nil {
 		log.WithField("err", err).Error("Start core failed")
-		return
+		return err
 	}
 	defer v2core.Close()
 
 	err = nodes.Start(c.NodeConfigs, v2core)
 	if err != nil {
 		log.WithField("err", err).Error("Run nodes failed")
-		return
+		return err
 	}
 	log.Info("Nodes started")
 
@@ -205,7 +205,7 @@ func serverHandle(_ *cobra.Command, _ []string) {
 		})
 		if err != nil {
 			log.WithField("err", err).Error("start watch failed")
-			return
+			return err
 		}
 	}
 
@@ -216,7 +216,7 @@ func serverHandle(_ *cobra.Command, _ []string) {
 		select {
 		case <-osSignals:
 			log.Info("Received shutdown signal, closing...")
-			return
+			return nil
 		case <-reloadCh:
 			log.Info("Received reload signal, reloading configuration...")
 			if err := reload(config, &nodes, &v2core, &resources); err != nil {
@@ -252,33 +252,32 @@ func reload(configPath string, nodes **node.Node, v2core **core.V2Core, resource
 		oldReloadCh = (*v2core).ReloadCh
 	}
 
-	if err := (*nodes).Close(); err != nil {
-		log.WithField("err", err).Error("Failed to close nodes, attempting recovery")
-		return err
-	}
-
-	if err := (*v2core).Close(); err != nil {
-		log.WithField("err", err).Error("Failed to close core, attempting recovery")
-		return err
-	}
-
+	// 先构建新配置，成功后再关闭旧配置（保证可回滚）
 	newNodes, err := node.New(newConf.NodeConfigs)
 	if err != nil {
-		log.WithField("err", err).Error("Failed to create new nodes")
+		log.WithField("err", err).Error("Failed to create new nodes, keeping current configuration")
 		return err
 	}
 
 	newCore := core.New(newConf)
 	newCore.ReloadCh = oldReloadCh
 	if err := newCore.Start(newNodes.NodeInfos); err != nil {
-		log.WithField("err", err).Error("Failed to start new core")
+		log.WithField("err", err).Error("Failed to start new core, keeping current configuration")
 		return err
 	}
 
 	if err := newNodes.Start(newConf.NodeConfigs, newCore); err != nil {
-		log.WithField("err", err).Error("Failed to start new nodes")
+		log.WithField("err", err).Error("Failed to start new nodes, rolling back")
 		newCore.Close()
 		return err
+	}
+
+	// 新配置启动成功，关闭旧配置
+	if err := (*nodes).Close(); err != nil {
+		log.WithField("err", err).Warn("Failed to close old nodes (non-fatal)")
+	}
+	if err := (*v2core).Close(); err != nil {
+		log.WithField("err", err).Warn("Failed to close old core (non-fatal)")
 	}
 
 	if newConf.LogConfig.Level != log.GetLevel().String() {

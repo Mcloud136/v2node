@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	panel "github.com/wyx2685/v2node/api/v2board"
@@ -45,7 +46,9 @@ func New(nodes []conf.NodeConfig) (*Node, error) {
 				resultCh <- nodeInitResult{index: index, err: err}
 				return
 			}
-			info, err := p.GetNodeInfo(context.Background())
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			info, err := p.GetNodeInfo(ctx)
 			if err != nil {
 				resultCh <- nodeInitResult{index: index, err: err}
 				return

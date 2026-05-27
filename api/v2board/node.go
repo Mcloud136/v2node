@@ -153,7 +153,7 @@ func (c *Client) GetNodeInfo(ctx context.Context) (node *NodeInfo, err error) {
 	cm := &CommonNode{}
 	err = json.Unmarshal(r.Body(), cm)
 	if err != nil {
-		return nil, fmt.Errorf("decode node params error: %s", err)
+		return nil, fmt.Errorf("decode node params error: %w", err)
 	}
 	switch cm.Protocol {
 	case "vmess", "trojan", "hysteria2", "tuic", "anytls", "vless":

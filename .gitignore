@@ -11,7 +11,7 @@ app/legocmd/.lego/
 .vscode/launch.json
 example/.lego
 example/cert
-./vscode
+.vscode/
 output/*
 .idea/*
 new.sh

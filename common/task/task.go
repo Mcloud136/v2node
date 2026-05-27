@@ -3,6 +3,7 @@ package task
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -17,6 +18,7 @@ type Task struct {
 	Running  bool
 	ReloadCh chan struct{}
 	Stop     chan struct{}
+	done     chan struct{}
 }
 
 func (t *Task) Start(first bool) error {
@@ -27,16 +29,24 @@ func (t *Task) Start(first bool) error {
 	}
 	t.Running = true
 	t.Stop = make(chan struct{})
+	t.done = make(chan struct{})
 	t.Access.Unlock()
 	go func() {
+		defer func() {
+			t.Access.Lock()
+			t.Running = false
+			t.Access.Unlock()
+			close(t.done)
+		}()
 		timer := time.NewTimer(t.Interval)
 		defer timer.Stop()
 		if first {
 			if err := t.ExecuteWithTimeout(); err != nil {
-				return
+				log.Errorf("Task %s first execution error: %v", t.Name, err)
 			}
 		}
 
+		consecutiveErrors := 0
 		for {
 			timer.Reset(t.Interval)
 			select {
@@ -47,8 +57,20 @@ func (t *Task) Start(first bool) error {
 			}
 
 			if err := t.ExecuteWithTimeout(); err != nil {
-				log.Errorf("Task %s execution error: %v", t.Name, err)
-				return
+				consecutiveErrors++
+				log.Errorf("Task %s execution error (consecutive: %d): %v", t.Name, consecutiveErrors, err)
+				// 指数退避：错误越多等待越久，但不超过 5 分钟
+				backoff := time.Duration(consecutiveErrors) * 30 * time.Second
+				if backoff > 5*time.Minute {
+					backoff = 5 * time.Minute
+				}
+				select {
+				case <-time.After(backoff):
+				case <-t.Stop:
+					return
+				}
+			} else {
+				consecutiveErrors = 0
 			}
 		}
 	}()
@@ -56,18 +78,22 @@ func (t *Task) Start(first bool) error {
 	return nil
 }
 
-func (t *Task) ExecuteWithTimeout() error {
+func (t *Task) ExecuteWithTimeout() (retErr error) {
 	ctx, cancel := context.WithTimeout(context.Background(), min(5*t.Interval, 5*time.Minute))
 	defer cancel()
 	done := make(chan error, 1)
 
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				done <- fmt.Errorf("panic in task %s: %v", t.Name, r)
+			}
+		}()
 		done <- t.Execute(ctx)
 	}()
 
 	select {
 	case <-ctx.Done():
-		// cancel() 已在 defer 中调用，内层 goroutine 会收到 context 取消信号
 		log.Errorf("Task %s execution timed out, reloading", t.Name)
 		if t.ReloadCh != nil {
 			select {
@@ -97,5 +123,8 @@ func (t *Task) safeStop() {
 
 func (t *Task) Close() {
 	t.safeStop()
+	if t.done != nil {
+		<-t.done
+	}
 	log.Warningf("Task %s stopped", t.Name)
 }
