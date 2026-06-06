@@ -68,9 +68,8 @@ func New(c *conf.NodeConfig) (*Client, error) {
 	client.SetQueryParams(map[string]string{
 		"node_type": "v2node",
 		"node_id":   strconv.Itoa(c.NodeID),
+		"token":     c.Key,
 	})
-	// API Token 通过请求头传递，避免暴露在 URL 中被日志记录
-	client.SetHeader("Authorization", "Bearer "+c.Key)
 	return &Client{
 		client:   client,
 		Token:    c.Key,
