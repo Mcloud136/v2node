@@ -81,6 +81,7 @@ func (vc *V2Core) GetUserTrafficSlice(tag string, mintraffic int) ([]panel.UserT
 		c.Counters.Range(func(key, value interface{}) bool {
 			email := key.(string)
 			traffic := value.(*counter.TrafficStorage)
+			// 使用 Swap(0) 原子读取并清零，避免 Load+Store 之间的竞态
 			up := traffic.UpCounter.Swap(0)
 			down := traffic.DownCounter.Swap(0)
 			if up+down > int64(mintraffic)*1000 {
@@ -93,6 +94,10 @@ func (vc *V2Core) GetUserTrafficSlice(tag string, mintraffic int) ([]panel.UserT
 					Upload:   up,
 					Download: down,
 				})
+			} else {
+				// 未达阈值：将流量放回计数器，继续累积至下一周期
+				traffic.UpCounter.Add(up)
+				traffic.DownCounter.Add(down)
 			}
 			return true
 		})

@@ -73,6 +73,9 @@ func (c *Controller) requestCert() error {
 	return nil
 }
 
+// generateSelfSslCertificate 生成 RSA-2048 自签名证书。
+// 注意：密钥文件 PEM 类型为 "RSA PRIVATE KEY"。如果下游 TLS 终端
+// （nginx、haproxy）配置为期望 EC 密钥格式，需要更新配置。
 func generateSelfSslCertificate(domain, certPath, keyPath string) error {
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {

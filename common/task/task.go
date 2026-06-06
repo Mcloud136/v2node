@@ -4,11 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand"
 	"sync"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 )
+
+const maxConsecutiveErrors = 20
 
 type Task struct {
 	Name     string
@@ -59,14 +62,22 @@ func (t *Task) Start(first bool) error {
 			if err := t.ExecuteWithTimeout(); err != nil {
 				consecutiveErrors++
 				log.Errorf("Task %s execution error (consecutive: %d): %v", t.Name, consecutiveErrors, err)
-				// 指数退避：错误越多等待越久，但不超过 5 分钟
-				backoff := time.Duration(consecutiveErrors) * 30 * time.Second
-				if backoff > 5*time.Minute {
-					backoff = 5 * time.Minute
+				if consecutiveErrors >= maxConsecutiveErrors {
+					log.Errorf("Task %s failed %d consecutive times, stopping", t.Name, consecutiveErrors)
+					return
 				}
+				// 指数退避 + 随机抖动：避免雷群效应
+				baseBackoff := time.Duration(consecutiveErrors) * 30 * time.Second
+				if baseBackoff > 5*time.Minute {
+					baseBackoff = 5 * time.Minute
+				}
+				jitter := time.Duration(rand.Int63n(int64(baseBackoff) / 4))
+				backoff := baseBackoff + jitter
+				backoffTimer := time.NewTimer(backoff)
 				select {
-				case <-time.After(backoff):
+				case <-backoffTimer.C:
 				case <-t.Stop:
+					backoffTimer.Stop()
 					return
 				}
 			} else {

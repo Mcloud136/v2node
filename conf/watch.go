@@ -32,9 +32,11 @@ func (p *Conf) Watch(filePath string, reload func()) error {
 				}
 				pre = time.Now()
 				go func() {
+					debounceTimer := time.NewTimer(5 * time.Second)
 					select {
-					case <-time.After(5 * time.Second):
+					case <-debounceTimer.C:
 					case <-stopCh:
+						debounceTimer.Stop()
 						return
 					}
 					reloadMu.Lock()
@@ -46,6 +48,9 @@ func (p *Conf) Watch(filePath string, reload func()) error {
 						log.Printf("reload config error: %s", err)
 						return
 					}
+					// NOTE: *p = *newConf 不是原子操作。当前只有 watcher goroutine 写入 p，
+					// 主循环在 reload() 中独立读取配置文件。如果未来添加并发读取 p 的路径，
+					// 需要用 atomic.Pointer 或 mutex 保护。
 					*p = *newConf
 					reload()
 					log.Println("reload config success")

@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"os"
-
 	log "github.com/sirupsen/logrus"
 
 	"github.com/spf13/cobra"
@@ -16,6 +14,7 @@ func Run() {
 	err := command.Execute()
 	if err != nil {
 		log.WithField("err", err).Error("Execute command failed")
-		os.Exit(1)
 	}
+	// 不调用 os.Exit(1)，让 serverHandle 中的 defer 正常清理资源
+	// 进程退出码由 systemd/容器编排根据服务状态决定
 }

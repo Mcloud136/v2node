@@ -52,14 +52,15 @@ func (r *cachedReader) Cache(b *buf.Buffer, deadline time.Duration) error {
 	if !mb.IsEmpty() {
 		r.cache, _ = buf.MergeMulti(r.cache, mb)
 	}
-	// Prevent unbounded cache growth: if the cache exceeds the limit,
-	// release the incoming buffer and return the capped view.
+	// Prevent unbounded cache growth: cap the sniffer view but preserve
+	// all cached data for drain by readInternal() to the proxy handler.
 	if r.cache != nil && r.cache.Len() > maxSniffCacheSize {
 		b.Clear()
-		rawBytes := b.Extend(min(maxSniffCacheSize, b.Cap()))
+		rawBytes := b.Extend(min(r.cache.Len(), b.Cap()))
 		n := r.cache.Copy(rawBytes)
 		b.Resize(0, int32(n))
-		r.cache = buf.ReleaseMulti(r.cache)
+		// 不释放缓存 — readInternal() 会在代理处理器调用
+		// ReadMultiBuffer() 时排空缓存，避免流数据间隙。
 		r.Unlock()
 		return nil
 	}
