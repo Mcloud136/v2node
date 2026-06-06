@@ -2,11 +2,11 @@ package conf
 
 import (
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+	log "github.com/sirupsen/logrus"
 )
 
 func (p *Conf) Watch(filePath string, reload func()) error {
@@ -41,11 +41,11 @@ func (p *Conf) Watch(filePath string, reload func()) error {
 					}
 					reloadMu.Lock()
 					defer reloadMu.Unlock()
-					log.Println("config file changed, reloading...")
+					log.Info("config file changed, reloading...")
 					newConf := New()
 					err := newConf.LoadFromPath(filePath)
 					if err != nil {
-						log.Printf("reload config error: %s", err)
+						log.WithField("err", err).Error("reload config error")
 						return
 					}
 					// NOTE: *p = *newConf 不是原子操作。当前只有 watcher goroutine 写入 p，
@@ -53,11 +53,11 @@ func (p *Conf) Watch(filePath string, reload func()) error {
 					// 需要用 atomic.Pointer 或 mutex 保护。
 					*p = *newConf
 					reload()
-					log.Println("reload config success")
+					log.Info("reload config success")
 				}()
 			case err := <-watcher.Errors:
 				if err != nil {
-					log.Printf("File watcher error: %s", err)
+					log.WithField("err", err).Warn("file watcher error")
 				}
 			case <-stopCh:
 				return

@@ -348,10 +348,10 @@ func buildShadowsocks(nodeInfo *panel.NodeInfo, inbound *coreConf.InboundDetourC
 	}
 
 	sets, err := json.Marshal(settings)
-	inbound.Settings = (*json.RawMessage)(&sets)
 	if err != nil {
 		return fmt.Errorf("marshal shadowsocks settings error: %w", err)
 	}
+	inbound.Settings = (*json.RawMessage)(&sets)
 	return nil
 }
 
@@ -389,11 +389,11 @@ func buildHysteria2(nodeInfo *panel.NodeInfo, inbound *coreConf.InboundDetourCon
 	}
 	inbound.StreamSetting.FinalMask = finalmask
 	sets, err := json.Marshal(settings)
-	inbound.Settings = (*json.RawMessage)(&sets)
-	inbound.StreamSetting.HysteriaSettings = hysteriasetting
 	if err != nil {
 		return fmt.Errorf("marshal hysteria2 settings error: %w", err)
 	}
+	inbound.Settings = (*json.RawMessage)(&sets)
+	inbound.StreamSetting.HysteriaSettings = hysteriasetting
 	return nil
 }
 
@@ -407,10 +407,10 @@ func buildTuic(nodeInfo *panel.NodeInfo, inbound *coreConf.InboundDetourConfig) 
 	t := coreConf.TransportProtocol("tuic")
 	inbound.StreamSetting = &coreConf.StreamConfig{Network: &t}
 	sets, err := json.Marshal(settings)
-	inbound.Settings = (*json.RawMessage)(&sets)
 	if err != nil {
 		return fmt.Errorf("marshal tuic settings error: %w", err)
 	}
+	inbound.Settings = (*json.RawMessage)(&sets)
 	return nil
 }
 
@@ -428,9 +428,9 @@ func buildAnyTLS(nodeInfo *panel.NodeInfo, inbound *coreConf.InboundDetourConfig
 		}
 	}
 	sets, err := json.Marshal(settings)
-	inbound.Settings = (*json.RawMessage)(&sets)
 	if err != nil {
 		return fmt.Errorf("marshal anytls settings error: %w", err)
 	}
+	inbound.Settings = (*json.RawMessage)(&sets)
 	return nil
 }

@@ -19,7 +19,7 @@ func buildDefaultOutbound() (*core.OutboundHandlerConfig, error) {
 	}
 	settingBytes, err := json.Marshal(proxySetting)
 	if err != nil {
-		return nil, fmt.Errorf("marshal proxy config error: %s", err)
+		return nil, fmt.Errorf("marshal proxy config error: %w", err)
 	}
 	setting := json.RawMessage(settingBytes)
 	outboundDetourConfig.Settings = &setting

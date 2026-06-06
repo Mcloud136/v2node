@@ -47,11 +47,11 @@ func (c *Controller) requestCert() error {
 		}
 		l, err := NewLego(cert)
 		if err != nil {
-			return fmt.Errorf("create lego object error: %s", err)
+			return fmt.Errorf("create lego object error: %w", err)
 		}
 		err = l.CreateCert()
 		if err != nil {
-			return fmt.Errorf("create lego cert error: %s", err)
+			return fmt.Errorf("create lego cert error: %w", err)
 		}
 	case "self":
 		if cert.CertFile == "" || cert.KeyFile == "" {
@@ -65,7 +65,7 @@ func (c *Controller) requestCert() error {
 			cert.CertFile,
 			cert.KeyFile)
 		if err != nil {
-			return fmt.Errorf("generate self cert error: %s", err)
+			return fmt.Errorf("generate self cert error: %w", err)
 		}
 	default:
 		return fmt.Errorf("unsupported certmode: %s", cert.CertMode)
