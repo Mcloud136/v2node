@@ -30,6 +30,9 @@ jobs:
       - name: Go Vet
         run: go vet ./...
 
+      - name: Go Test
+        run: go test ./... -v -timeout 60s -count=1
+
       - name: Staticcheck
         uses: dominikh/staticcheck-action@v1.3.1
         with:
