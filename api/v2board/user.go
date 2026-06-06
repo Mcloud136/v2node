@@ -121,25 +121,32 @@ func (c *Client) ReportUserTraffic(ctx context.Context, userTraffic []UserTraffi
 		c.reportBuffer[userTraffic[i].UID] = []int64{userTraffic[i].Upload, userTraffic[i].Download}
 	}
 	const path = "/api/v1/server/UniProxy/push"
-	_, err := c.client.R().
+	r, err := c.client.R().
 		SetContext(ctx).
 		SetBody(c.reportBuffer).
 		ForceContentType("application/json").
 		Post(path)
-	return err
+	if err != nil {
+		return err
+	}
+	if r.StatusCode() >= 400 {
+		return fmt.Errorf("report user traffic failed: HTTP %d", r.StatusCode())
+	}
+	return nil
 }
 
 func (c *Client) ReportNodeOnlineUsers(ctx context.Context, data *map[int][]string) error {
 	const path = "/api/v1/server/UniProxy/alive"
-	_, err := c.client.R().
+	r, err := c.client.R().
 		SetContext(ctx).
 		SetBody(data).
 		ForceContentType("application/json").
 		Post(path)
-
 	if err != nil {
 		return err
 	}
-
+	if r.StatusCode() >= 400 {
+		return fmt.Errorf("report online users failed: HTTP %d", r.StatusCode())
+	}
 	return nil
 }
