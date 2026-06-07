@@ -96,7 +96,7 @@ func (n *Node) Start(nodes []conf.NodeConfig, core *core.V2Core) error {
 	}()
 	for r := range results {
 		if r.err != nil {
-			return fmt.Errorf("start node controller [%s-%d] error: %s",
+			return fmt.Errorf("start node controller [%s-%d] error: %w",
 				nodes[r.index].APIHost,
 				nodes[r.index].NodeID,
 				r.err)
