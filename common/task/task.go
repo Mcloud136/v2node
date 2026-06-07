@@ -66,11 +66,8 @@ func (t *Task) Start(first bool) error {
 					log.Errorf("Task %s failed %d consecutive times, stopping", t.Name, consecutiveErrors)
 					return
 				}
-				// 指数退避 + 随机抖动：从 5 秒起，指数增长，上限 5 分钟
+				// 指数退避 + 随机抖动：从 5 秒起，指数增长，单次上限 160 秒
 				baseBackoff := 5 * time.Second * (1 << min(consecutiveErrors-1, 5))
-				if baseBackoff > 5*time.Minute {
-					baseBackoff = 5 * time.Minute
-				}
 				jitter := time.Duration(rand.Int63n(int64(baseBackoff) / 4))
 				backoff := baseBackoff + jitter
 				backoffTimer := time.NewTimer(backoff)
