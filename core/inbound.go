@@ -54,7 +54,7 @@ func (v *V2Core) addInbound(config *core.InboundHandlerConfig) error {
 	}
 	handler, ok := rawHandler.(inbound.Handler)
 	if !ok {
-		return fmt.Errorf("not an InboundHandler")
+		return fmt.Errorf("not an InboundHandler: got %T", rawHandler)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

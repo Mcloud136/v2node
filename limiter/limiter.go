@@ -295,20 +295,27 @@ func (l *Limiter) CheckLimit(taguuid string, ip string, noUDPsource bool) (*rate
 	speedLimit := u.SpeedLimit
 	dynamicSpeedLimit := u.DynamicSpeedLimit
 	expireTime := u.ExpireTime
+	needReset := expireTime != 0 && expireTime < time.Now().Unix()
 	u.mu.RUnlock()
 
-	now := time.Now().Unix()
-	if expireTime != 0 && expireTime < now {
-		if speedLimit != 0 {
-			userLimit = speedLimit
-			u.mu.Lock()
-			u.DynamicSpeedLimit = 0
-			u.ExpireTime = 0
-			u.mu.Unlock()
+	if needReset {
+		// 使用写锁完成过期检查+重置，防止 TOCTOU 竞态覆盖新写入的值
+		u.mu.Lock()
+		if u.ExpireTime != 0 && u.ExpireTime < time.Now().Unix() {
+			if u.SpeedLimit != 0 {
+				userLimit = u.SpeedLimit
+				u.DynamicSpeedLimit = 0
+				u.ExpireTime = 0
+			} else {
+				u.mu.Unlock()
+				l.UserLimit.Delete(taguuid)
+				return nil, true
+			}
 		} else {
-			l.UserLimit.Delete(taguuid)
-			return nil, true
+			// 其他 goroutine 已更新过期时间，重新读取
+			userLimit = determineSpeedLimit(u.SpeedLimit, u.DynamicSpeedLimit)
 		}
+		u.mu.Unlock()
 	} else {
 		userLimit = determineSpeedLimit(speedLimit, dynamicSpeedLimit)
 	}

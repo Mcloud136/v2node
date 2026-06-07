@@ -27,10 +27,8 @@ func (c *Conn) Read(b []byte) (n int, err error) {
 }
 
 func (c *Conn) Write(b []byte) (n int, err error) {
+	c.limiter.Wait(int64(len(b)))
 	n, err = c.Conn.Write(b)
-	if n > 0 {
-		c.limiter.Wait(int64(n))
-	}
 	return
 }
 
