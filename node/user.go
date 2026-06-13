@@ -15,13 +15,7 @@ func (c *Controller) reportUserTrafficTask(ctx context.Context) (err error) {
 		reportmin = c.info.Common.BaseConfig.NodeReportMinTraffic
 		devicemin = c.info.Common.BaseConfig.DeviceOnlineMinTraffic
 	}
-	userTraffic, err := c.server.GetUserTrafficSlice(c.tag, reportmin)
-	if err != nil {
-		log.WithFields(log.Fields{
-			"tag": c.tag,
-			"err": err,
-		}).Warn("Get user traffic slice failed")
-	}
+	userTraffic, _ := c.server.GetUserTrafficSlice(c.tag, reportmin)
 	if len(userTraffic) > 0 {
 		err = c.apiClient.ReportUserTraffic(ctx, userTraffic)
 		if err != nil {
@@ -44,9 +38,8 @@ func (c *Controller) reportUserTrafficTask(ctx context.Context) (err error) {
 			"err": err,
 		}).Info("Get online device failed")
 	} else if len(*onlineDevice) > 0 {
-		// 预分配容量，减少内存分配
-		result := make([]panel.OnlineUser, 0, len(*onlineDevice))
-		nocountUID := make(map[int]struct{}, len(userTraffic))
+		var result []panel.OnlineUser
+		var nocountUID = make(map[int]struct{})
 		for _, traffic := range userTraffic {
 			total := traffic.Upload + traffic.Download
 			if total < int64(devicemin*1000) {
@@ -58,8 +51,7 @@ func (c *Controller) reportUserTrafficTask(ctx context.Context) (err error) {
 				result = append(result, online)
 			}
 		}
-		// 预分配 map 容量
-		data := make(map[int][]string, len(result))
+		data := make(map[int][]string)
 		for _, onlineuser := range result {
 			// json structure: { UID1:["ip1","ip2"],UID2:["ip3","ip4"] }
 			data[onlineuser.UID] = append(data[onlineuser.UID], onlineuser.IP)
@@ -83,15 +75,10 @@ func (c *Controller) reportUserTrafficTask(ctx context.Context) (err error) {
 }
 
 func compareUserList(old, new []panel.UserInfo) (deleted, added, modified []panel.UserInfo) {
-	// 预分配容量，减少扩容
 	oldMap := make(map[string]panel.UserInfo, len(old))
 	for _, u := range old {
 		oldMap[u.Uuid] = u
 	}
-
-	// 预估切片容量，减少内存分配
-	added = make([]panel.UserInfo, 0, len(new)/4)
-	modified = make([]panel.UserInfo, 0, len(new)/4)
 
 	for _, u := range new {
 		if o, ok := oldMap[u.Uuid]; !ok {
@@ -104,7 +91,6 @@ func compareUserList(old, new []panel.UserInfo) (deleted, added, modified []pane
 		}
 	}
 
-	deleted = make([]panel.UserInfo, 0, len(oldMap))
 	for _, o := range oldMap {
 		deleted = append(deleted, o)
 	}

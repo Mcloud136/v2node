@@ -2,9 +2,8 @@ package panel
 
 import (
 	"errors"
-	"net/http"
+	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -25,31 +24,16 @@ type Client struct {
 	responseBodyHash string
 	UserList         *UserListBody
 	AliveMap         *AliveMap
-	reportBuffer     map[int][]int64 // 复用的流量上报缓冲区
 }
 
 func New(c *conf.NodeConfig) (*Client, error) {
 	client := resty.New()
-	// 优化 HTTP 连接池配置，保持长连接复用
-	client.SetTransport(&http.Transport{
-		MaxIdleConns:        10,
-		MaxIdleConnsPerHost: 10,
-		IdleConnTimeout:     90 * time.Second,
-	})
 	retryCount := conf.DefaultNodeRetryCount
 	if c.RetryCount != nil {
 		retryCount = *c.RetryCount
 	}
 	client.SetRetryCount(retryCount)
-
-	// 使用strings.Builder优化User-Agent字符串构造
-	var userAgent strings.Builder
-	userAgent.Grow(len("v2node go-resty/ (https://github.com/go-resty/resty)") + len(resty.Version))
-	userAgent.WriteString("v2node go-resty/")
-	userAgent.WriteString(resty.Version)
-	userAgent.WriteString(" (https://github.com/go-resty/resty)")
-	client.SetHeader("User-Agent", userAgent.String())
-
+	client.SetHeader("User-Agent", fmt.Sprintf("v2node go-resty/%s (https://github.com/go-resty/resty)", resty.Version))
 	if c.Timeout > 0 {
 		client.SetTimeout(time.Duration(c.Timeout) * time.Second)
 	} else {

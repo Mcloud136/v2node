@@ -11,11 +11,8 @@ app/legocmd/.lego/
 .vscode/launch.json
 example/.lego
 example/cert
-.vscode/
+./vscode
 output/*
 .idea/*
 new.sh
 quick_update.sh
-*.exe
-v2node
-v2node-*

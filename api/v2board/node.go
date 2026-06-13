@@ -5,6 +5,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -57,7 +59,7 @@ type CommonNode struct {
 	UpMbps                  int    `json:"up_mbps"`
 	DownMbps                int    `json:"down_mbps"`
 	Obfs                    string `json:"obfs"`
-	ObfsPassword            string `json:"obfs-password"`
+	ObfsPassword            string `json:"obfs_password"`
 	Ignore_Client_Bandwidth bool   `json:"ignore_client_bandwidth"`
 }
 
@@ -125,11 +127,6 @@ func (c *Client) GetNodeInfo(ctx context.Context) (node *NodeInfo, err error) {
 	if r == nil {
 		return nil, fmt.Errorf("received nil response")
 	}
-	defer func() {
-		if r.RawBody() != nil {
-			r.RawBody().Close()
-		}
-	}()
 
 	if r.StatusCode() == 304 {
 		return nil, nil
@@ -142,6 +139,15 @@ func (c *Client) GetNodeInfo(ctx context.Context) (node *NodeInfo, err error) {
 	c.responseBodyHash = newBodyHash
 	c.nodeEtag = r.Header().Get("ETag")
 
+	if r != nil {
+		defer func() {
+			if r.RawBody() != nil {
+				r.RawBody().Close()
+			}
+		}()
+	} else {
+		return nil, fmt.Errorf("received nil response")
+	}
 	node = &NodeInfo{
 		Id: c.NodeId,
 	}
@@ -149,7 +155,7 @@ func (c *Client) GetNodeInfo(ctx context.Context) (node *NodeInfo, err error) {
 	cm := &CommonNode{}
 	err = json.Unmarshal(r.Body(), cm)
 	if err != nil {
-		return nil, fmt.Errorf("decode node params error: %w", err)
+		return nil, fmt.Errorf("decode node params error: %s", err)
 	}
 	switch cm.Protocol {
 	case "vmess", "trojan", "hysteria2", "tuic", "anytls", "vless":
@@ -161,36 +167,14 @@ func (c *Client) GetNodeInfo(ctx context.Context) (node *NodeInfo, err error) {
 	default:
 		return nil, fmt.Errorf("unsupport protocol: %s", cm.Protocol)
 	}
-	// 优化Tag字符串构造
-	var tagBuilder strings.Builder
-	tagBuilder.Grow(len(c.APIHost) + len(node.Type) + 20)
-	tagBuilder.WriteString("[")
-	tagBuilder.WriteString(c.APIHost)
-	tagBuilder.WriteString("]-")
-	tagBuilder.WriteString(node.Type)
-	tagBuilder.WriteString(":")
-	tagBuilder.WriteString(strconv.Itoa(node.Id))
-	node.Tag = tagBuilder.String()
-
+	node.Tag = fmt.Sprintf("[%s]-%s:%d", c.APIHost, node.Type, node.Id)
 	cf := cm.TlsSettings.CertFile
 	kf := cm.TlsSettings.KeyFile
 	if cf == "" {
-		var certBuilder strings.Builder
-		certBuilder.Grow(len("/etc/v2node/") + len(cm.Protocol) + 20)
-		certBuilder.WriteString("/etc/v2node/")
-		certBuilder.WriteString(cm.Protocol)
-		certBuilder.WriteString(strconv.Itoa(c.NodeId))
-		certBuilder.WriteString(".cer")
-		cf = certBuilder.String()
+		cf = filepath.Join("/etc/v2node/", cm.Protocol+strconv.Itoa(c.NodeId)+".cer")
 	}
 	if kf == "" {
-		var keyBuilder strings.Builder
-		keyBuilder.Grow(len("/etc/v2node/") + len(cm.Protocol) + 20)
-		keyBuilder.WriteString("/etc/v2node/")
-		keyBuilder.WriteString(cm.Protocol)
-		keyBuilder.WriteString(strconv.Itoa(c.NodeId))
-		keyBuilder.WriteString(".key")
-		kf = keyBuilder.String()
+		kf = filepath.Join("/etc/v2node/", cm.Protocol+strconv.Itoa(c.NodeId)+".key")
 	}
 	cm.CertInfo = &CertInfo{
 		CertMode:         cm.TlsSettings.CertMode,
@@ -222,19 +206,17 @@ func (c *Client) GetNodeInfo(ctx context.Context) (node *NodeInfo, err error) {
 }
 
 func intervalToTime(i interface{}) time.Duration {
-	switch v := i.(type) {
-	case int:
-		return time.Duration(v) * time.Second
-	case int64:
-		return time.Duration(v) * time.Second
-	case float64:
-		return time.Duration(v) * time.Second
-	case string:
-		if val, err := strconv.Atoi(v); err == nil {
-			return time.Duration(val) * time.Second
-		}
+	switch reflect.TypeOf(i).Kind() {
+	case reflect.Int:
+		return time.Duration(i.(int)) * time.Second
+	case reflect.String:
+		i, _ := strconv.Atoi(i.(string))
+		return time.Duration(i) * time.Second
+	case reflect.Float64:
+		return time.Duration(i.(float64)) * time.Second
+	default:
+		return time.Duration(reflect.ValueOf(i).Int()) * time.Second
 	}
-	return 0
 }
 
 func (t TlsSettings) EffectiveServerNames() []string {

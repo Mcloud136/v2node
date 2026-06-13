@@ -23,8 +23,10 @@ func (c *TrafficCounter) GetCounter(uuid string) *TrafficStorage {
 		return cts.(*TrafficStorage)
 	}
 	newStorage := &TrafficStorage{}
-	cts, _ := c.Counters.LoadOrStore(uuid, newStorage)
-	return cts.(*TrafficStorage)
+	if cts, loaded := c.Counters.LoadOrStore(uuid, newStorage); loaded {
+		return cts.(*TrafficStorage)
+	}
+	return newStorage
 }
 
 func (c *TrafficCounter) GetUpCount(uuid string) int64 {

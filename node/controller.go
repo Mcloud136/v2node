@@ -47,21 +47,21 @@ func (c *Controller) Start(x *core.V2Core) error {
 	if node == nil {
 		c.info, err = c.apiClient.GetNodeInfo(context.Background())
 		if err != nil {
-			return fmt.Errorf("get node info error: %w", err)
+			return fmt.Errorf("get node info error: %s", err)
 		}
 		node = c.info
 	}
 	// Update user
 	c.userList, err = c.apiClient.GetUserList(context.Background())
 	if err != nil {
-		return fmt.Errorf("get user list error: %w", err)
+		return fmt.Errorf("get user list error: %s", err)
 	}
 	if len(c.userList) == 0 {
 		return errors.New("add users error: not have any user")
 	}
 	c.aliveMap, err = c.apiClient.GetUserAlive(context.Background())
 	if err != nil {
-		return fmt.Errorf("failed to get user alive list: %w", err)
+		return fmt.Errorf("failed to get user alive list: %s", err)
 	}
 	c.tag = node.Tag
 
@@ -71,13 +71,13 @@ func (c *Controller) Start(x *core.V2Core) error {
 	if node.Security == panel.Tls {
 		err = c.requestCert()
 		if err != nil {
-			return fmt.Errorf("request cert error: %w", err)
+			return fmt.Errorf("request cert error: %s", err)
 		}
 	}
 	// Add new tag
 	err = c.server.AddNode(c.tag, node)
 	if err != nil {
-		return fmt.Errorf("add new node error: %w", err)
+		return fmt.Errorf("add new node error: %s", err)
 	}
 	added, err := c.server.AddUsers(&core.AddUsersParams{
 		Tag:      c.tag,
@@ -85,7 +85,7 @@ func (c *Controller) Start(x *core.V2Core) error {
 		NodeInfo: node,
 	})
 	if err != nil {
-		return fmt.Errorf("add users error: %w", err)
+		return fmt.Errorf("add users error: %s", err)
 	}
 	log.WithField("tag", c.tag).Infof("Added %d new users", added)
 	c.info = node
@@ -107,7 +107,7 @@ func (c *Controller) Close() error {
 	}
 	err := c.server.DelNode(c.tag)
 	if err != nil {
-		return fmt.Errorf("del node error: %w", err)
+		return fmt.Errorf("del node error: %s", err)
 	}
 	return nil
 }

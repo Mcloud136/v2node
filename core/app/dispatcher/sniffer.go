@@ -29,38 +29,26 @@ type protocolSnifferWithMetadata struct {
 }
 
 type Sniffer struct {
-	sniffer  []protocolSnifferWithMetadata
-	readonly bool // true for shared singleton, false for per-connection
+	sniffer []protocolSnifferWithMetadata
 }
-
-// 静态嗅探器缓存 - 这些闭包不依赖 ctx，每连接复用避免堆分配
-var baseSniffers = []protocolSnifferWithMetadata{
-	{func(c context.Context, b []byte) (SniffResult, error) { return http.SniffHTTP(b, c) }, false, net.Network_TCP},
-	{func(c context.Context, b []byte) (SniffResult, error) { return tls.SniffTLS(b) }, false, net.Network_TCP},
-	{func(c context.Context, b []byte) (SniffResult, error) { return bittorrent.SniffBittorrent(b) }, false, net.Network_TCP},
-	{func(c context.Context, b []byte) (SniffResult, error) { return quic.SniffQUIC(b) }, false, net.Network_UDP},
-	{func(c context.Context, b []byte) (SniffResult, error) { return bittorrent.SniffUTP(b) }, false, net.Network_UDP},
-}
-
-// defaultSniffer is a process-wide singleton for connections that do not use
-// FakeDNS.  It is safe for concurrent use because Sniffer.Sniff never mutates
-// the sniffer slice.
-var defaultSniffer = &Sniffer{sniffer: baseSniffers, readonly: true}
 
 func NewSniffer(ctx context.Context) *Sniffer {
-	// When FakeDNS is not configured, return the shared singleton to avoid
-	// per-connection allocation.
-	sniffer, err := newFakeDNSSniffer(ctx)
-	if err != nil {
-		return defaultSniffer
+	ret := &Sniffer{
+		sniffer: []protocolSnifferWithMetadata{
+			{func(c context.Context, b []byte) (SniffResult, error) { return http.SniffHTTP(b, ctx) }, false, net.Network_TCP},
+			{func(c context.Context, b []byte) (SniffResult, error) { return tls.SniffTLS(b) }, false, net.Network_TCP},
+			{func(c context.Context, b []byte) (SniffResult, error) { return bittorrent.SniffBittorrent(b) }, false, net.Network_TCP},
+			{func(c context.Context, b []byte) (SniffResult, error) { return quic.SniffQUIC(b) }, false, net.Network_UDP},
+			{func(c context.Context, b []byte) (SniffResult, error) { return bittorrent.SniffUTP(b) }, false, net.Network_UDP},
+		},
 	}
-	// FakeDNS is active – build a per-request Sniffer as before.
-	ret := &Sniffer{sniffer: make([]protocolSnifferWithMetadata, len(baseSniffers), len(baseSniffers)+2)}
-	copy(ret.sniffer, baseSniffers)
-	ret.sniffer = append(ret.sniffer, sniffer)
-	fakeDNSThenOthers, err := newFakeDNSThenOthers(ctx, sniffer, baseSniffers)
-	if err == nil {
-		ret.sniffer = append([]protocolSnifferWithMetadata{fakeDNSThenOthers}, ret.sniffer...)
+	if sniffer, err := newFakeDNSSniffer(ctx); err == nil {
+		others := ret.sniffer
+		ret.sniffer = append(ret.sniffer, sniffer)
+		fakeDNSThenOthers, err := newFakeDNSThenOthers(ctx, sniffer, others)
+		if err == nil {
+			ret.sniffer = append([]protocolSnifferWithMetadata{fakeDNSThenOthers}, ret.sniffer...)
+		}
 	}
 	return ret
 }
@@ -86,10 +74,7 @@ func (s *Sniffer) Sniff(c context.Context, payload []byte, network net.Network) 
 	}
 
 	if len(pendingSniffer) > 0 {
-		// 仅非共享嗅探器允许渐进式缩减，避免并发竞态
-		if !s.readonly {
-			s.sniffer = pendingSniffer
-		}
+		s.sniffer = pendingSniffer
 		return nil, common.ErrNoClue
 	}
 
@@ -116,9 +101,7 @@ func (s *Sniffer) SniffMetadata(c context.Context) (SniffResult, error) {
 	}
 
 	if len(pendingSniffer) > 0 {
-		if !s.readonly {
-			s.sniffer = pendingSniffer
-		}
+		s.sniffer = pendingSniffer
 		return nil, common.ErrNoClue
 	}
 

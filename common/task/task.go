@@ -3,15 +3,11 @@ package task
 import (
 	"context"
 	"errors"
-	"fmt"
-	"math/rand"
 	"sync"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 )
-
-const maxConsecutiveErrors = 20
 
 type Task struct {
 	Name     string
@@ -21,7 +17,6 @@ type Task struct {
 	Running  bool
 	ReloadCh chan struct{}
 	Stop     chan struct{}
-	done     chan struct{}
 }
 
 func (t *Task) Start(first bool) error {
@@ -32,24 +27,16 @@ func (t *Task) Start(first bool) error {
 	}
 	t.Running = true
 	t.Stop = make(chan struct{})
-	t.done = make(chan struct{})
 	t.Access.Unlock()
 	go func() {
-		defer func() {
-			t.Access.Lock()
-			t.Running = false
-			t.Access.Unlock()
-			close(t.done)
-		}()
 		timer := time.NewTimer(t.Interval)
 		defer timer.Stop()
 		if first {
 			if err := t.ExecuteWithTimeout(); err != nil {
-				log.Errorf("Task %s first execution error: %v", t.Name, err)
+				return
 			}
 		}
 
-		consecutiveErrors := 0
 		for {
 			timer.Reset(t.Interval)
 			select {
@@ -60,25 +47,8 @@ func (t *Task) Start(first bool) error {
 			}
 
 			if err := t.ExecuteWithTimeout(); err != nil {
-				consecutiveErrors++
-				log.Errorf("Task %s execution error (consecutive: %d): %v", t.Name, consecutiveErrors, err)
-				if consecutiveErrors >= maxConsecutiveErrors {
-					log.Errorf("Task %s failed %d consecutive times, stopping", t.Name, consecutiveErrors)
-					return
-				}
-				// 指数退避 + 随机抖动：从 5 秒起，指数增长，单次上限 160 秒
-				baseBackoff := 5 * time.Second * (1 << min(consecutiveErrors-1, 5))
-				jitter := time.Duration(rand.Int63n(int64(baseBackoff) / 4))
-				backoff := baseBackoff + jitter
-				backoffTimer := time.NewTimer(backoff)
-				select {
-				case <-backoffTimer.C:
-				case <-t.Stop:
-					backoffTimer.Stop()
-					return
-				}
-			} else {
-				consecutiveErrors = 0
+				log.Errorf("Task %s execution error: %v", t.Name, err)
+				return
 			}
 		}
 	}()
@@ -86,17 +56,12 @@ func (t *Task) Start(first bool) error {
 	return nil
 }
 
-func (t *Task) ExecuteWithTimeout() (retErr error) {
+func (t *Task) ExecuteWithTimeout() error {
 	ctx, cancel := context.WithTimeout(context.Background(), min(5*t.Interval, 5*time.Minute))
 	defer cancel()
 	done := make(chan error, 1)
 
 	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				done <- fmt.Errorf("panic in task %s: %v", t.Name, r)
-			}
-		}()
 		done <- t.Execute(ctx)
 	}()
 
@@ -109,7 +74,7 @@ func (t *Task) ExecuteWithTimeout() (retErr error) {
 			default:
 			}
 		} else {
-			log.Error("Reload channel is nil, cannot trigger reload")
+			log.Panic("Reload failed")
 		}
 		return nil
 	case err := <-done:
@@ -131,8 +96,5 @@ func (t *Task) safeStop() {
 
 func (t *Task) Close() {
 	t.safeStop()
-	if t.done != nil {
-		<-t.done
-	}
 	log.Warningf("Task %s stopped", t.Name)
 }

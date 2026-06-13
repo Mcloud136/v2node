@@ -47,11 +47,11 @@ func (c *Controller) requestCert() error {
 		}
 		l, err := NewLego(cert)
 		if err != nil {
-			return fmt.Errorf("create lego object error: %w", err)
+			return fmt.Errorf("create lego object error: %s", err)
 		}
 		err = l.CreateCert()
 		if err != nil {
-			return fmt.Errorf("create lego cert error: %w", err)
+			return fmt.Errorf("create lego cert error: %s", err)
 		}
 	case "self":
 		if cert.CertFile == "" || cert.KeyFile == "" {
@@ -65,7 +65,7 @@ func (c *Controller) requestCert() error {
 			cert.CertFile,
 			cert.KeyFile)
 		if err != nil {
-			return fmt.Errorf("generate self cert error: %w", err)
+			return fmt.Errorf("generate self cert error: %s", err)
 		}
 	default:
 		return fmt.Errorf("unsupported certmode: %s", cert.CertMode)
@@ -73,22 +73,11 @@ func (c *Controller) requestCert() error {
 	return nil
 }
 
-// generateSelfSslCertificate 生成 RSA-2048 自签名证书。
-// 注意：密钥文件 PEM 类型为 "RSA PRIVATE KEY"。如果下游 TLS 终端
-// （nginx、haproxy）配置为期望 EC 密钥格式，需要更新配置。
 func generateSelfSslCertificate(domain, certPath, keyPath string) error {
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		return fmt.Errorf("generate RSA key failed: %w", err)
-	}
-	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
-	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
-	if err != nil {
-		return fmt.Errorf("generate serial number failed: %w", err)
-	}
+	key, _ := rsa.GenerateKey(rand.Reader, 2048)
 	tmpl := &x509.Certificate{
 		Version:      3,
-		SerialNumber: serialNumber,
+		SerialNumber: big.NewInt(time.Now().Unix()),
 		Subject: pkix.Name{
 			CommonName: domain,
 		},
@@ -103,25 +92,27 @@ func generateSelfSslCertificate(domain, certPath, keyPath string) error {
 	if err != nil {
 		return err
 	}
-	certFile, err := os.OpenFile(certPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	f, err := os.OpenFile(certPath, os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
 		return err
 	}
-	defer certFile.Close()
-	if err := pem.Encode(certFile, &pem.Block{
+	err = pem.Encode(f, &pem.Block{
 		Type:  "CERTIFICATE",
 		Bytes: cert,
-	}); err != nil {
-		return err
-	}
-
-	keyFile, err := os.OpenFile(keyPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
+	})
 	if err != nil {
 		return err
 	}
-	defer keyFile.Close()
-	return pem.Encode(keyFile, &pem.Block{
-		Type:  "RSA PRIVATE KEY",
+	f, err = os.OpenFile(keyPath, os.O_CREATE|os.O_RDWR, 0644)
+	if err != nil {
+		return err
+	}
+	err = pem.Encode(f, &pem.Block{
+		Type:  "EC PRIVATE KEY",
 		Bytes: x509.MarshalPKCS1PrivateKey(key),
 	})
+	if err != nil {
+		return err
+	}
+	return nil
 }

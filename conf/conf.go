@@ -1,6 +1,9 @@
 package conf
 
 import (
+	"fmt"
+	"os"
+
 	"github.com/spf13/viper"
 )
 
@@ -38,13 +41,18 @@ func New() *Conf {
 }
 
 func (p *Conf) LoadFromPath(filePath string) error {
+	f, err := os.Open(filePath)
+	if err != nil {
+		return fmt.Errorf("open config file error: %s", err)
+	}
+	defer f.Close()
 	v := viper.New()
 	v.SetConfigFile(filePath)
 	if err := v.ReadInConfig(); err != nil {
-		return err
+		return fmt.Errorf("read config file error: %s", err)
 	}
 	if err := v.Unmarshal(p); err != nil {
-		return err
+		return fmt.Errorf("unmarshal config error: %s", err)
 	}
 	for i := range p.NodeConfigs {
 		if p.NodeConfigs[i].RetryCount == nil {

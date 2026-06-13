@@ -2,13 +2,13 @@ package panel
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"strings"
 
-	"github.com/sirupsen/logrus"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
+
 	"github.com/vmihailenco/msgpack/v5"
 )
 
@@ -52,22 +52,41 @@ func (c *Client) GetUserList(ctx context.Context) ([]UserInfo, error) {
 	if r.StatusCode() == 304 {
 		return nil, nil
 	}
-	body, err := io.ReadAll(r.RawResponse.Body)
-	if err != nil {
-		return nil, fmt.Errorf("read response body error: %w", err)
-	}
-	contentType := r.Header().Get("Content-Type")
-	if strings.Contains(contentType, "application/x-msgpack") {
-		var userlist UserListBody
-		if err := msgpack.Unmarshal(body, &userlist); err != nil {
+	userlist := &UserListBody{}
+	if strings.Contains(r.Header().Get("Content-Type"), "application/x-msgpack") {
+		decoder := msgpack.NewDecoder(r.RawResponse.Body)
+		if err := decoder.Decode(userlist); err != nil {
 			return nil, fmt.Errorf("decode user list error: %w", err)
 		}
-		c.userEtag = r.Header().Get("ETag")
-		return userlist.Users, nil
-	}
-	var userlist UserListBody
-	if err := json.Unmarshal(body, &userlist); err != nil {
-		return nil, fmt.Errorf("decode user list error: %w", err)
+	} else {
+		dec := jsontext.NewDecoder(r.RawResponse.Body)
+		for {
+			tok, err := dec.ReadToken()
+			if err != nil {
+				return nil, fmt.Errorf("decode user list error: %w", err)
+			}
+			if tok.Kind() == '"' && tok.String() == "users" {
+				break
+			}
+		}
+		tok, err := dec.ReadToken()
+		if err != nil {
+			return nil, fmt.Errorf("decode user list error: %w", err)
+		}
+		if tok.Kind() != '[' {
+			return nil, fmt.Errorf(`decode user list error: expected "users" array`)
+		}
+		for dec.PeekKind() != ']' {
+			val, err := dec.ReadValue()
+			if err != nil {
+				return nil, fmt.Errorf("decode user list error: read user object: %w", err)
+			}
+			var u UserInfo
+			if err := json.Unmarshal(val, &u); err != nil {
+				return nil, fmt.Errorf("decode user list error: unmarshal user error: %w", err)
+			}
+			userlist.Users = append(userlist.Users, u)
+		}
 	}
 	c.userEtag = r.Header().Get("ETag")
 	return userlist.Users, nil
@@ -94,7 +113,7 @@ func (c *Client) GetUserAlive(ctx context.Context) (map[int]int, error) {
 	}
 	defer r.RawResponse.Body.Close()
 	if err := json.Unmarshal(r.Body(), c.AliveMap); err != nil {
-		logrus.WithField("err", err).Error("unmarshal user alive list error")
+		fmt.Printf("unmarshal user alive list error: %s", err)
 		c.AliveMap.Alive = make(map[int]int)
 	}
 
@@ -109,35 +128,12 @@ type UserTraffic struct {
 
 // ReportUserTraffic reports the user traffic
 func (c *Client) ReportUserTraffic(ctx context.Context, userTraffic []UserTraffic) error {
-	// 复用缓冲区，避免每次上报分配新 map
-	if c.reportBuffer == nil {
-		c.reportBuffer = make(map[int][]int64, len(userTraffic))
-	}
-	// 清空旧数据
-	for k := range c.reportBuffer {
-		delete(c.reportBuffer, k)
-	}
+	data := make(map[int][]int64, len(userTraffic))
 	for i := range userTraffic {
-		c.reportBuffer[userTraffic[i].UID] = []int64{userTraffic[i].Upload, userTraffic[i].Download}
+		data[userTraffic[i].UID] = []int64{userTraffic[i].Upload, userTraffic[i].Download}
 	}
 	const path = "/api/v1/server/UniProxy/push"
-	r, err := c.client.R().
-		SetContext(ctx).
-		SetBody(c.reportBuffer).
-		ForceContentType("application/json").
-		Post(path)
-	if err != nil {
-		return err
-	}
-	if r.StatusCode() >= 400 {
-		return fmt.Errorf("report user traffic failed: HTTP %d", r.StatusCode())
-	}
-	return nil
-}
-
-func (c *Client) ReportNodeOnlineUsers(ctx context.Context, data *map[int][]string) error {
-	const path = "/api/v1/server/UniProxy/alive"
-	r, err := c.client.R().
+	_, err := c.client.R().
 		SetContext(ctx).
 		SetBody(data).
 		ForceContentType("application/json").
@@ -145,8 +141,20 @@ func (c *Client) ReportNodeOnlineUsers(ctx context.Context, data *map[int][]stri
 	if err != nil {
 		return err
 	}
-	if r.StatusCode() >= 400 {
-		return fmt.Errorf("report online users failed: HTTP %d", r.StatusCode())
+	return nil
+}
+
+func (c *Client) ReportNodeOnlineUsers(ctx context.Context, data *map[int][]string) error {
+	const path = "/api/v1/server/UniProxy/alive"
+	_, err := c.client.R().
+		SetContext(ctx).
+		SetBody(data).
+		ForceContentType("application/json").
+		Post(path)
+
+	if err != nil {
+		return err
 	}
+
 	return nil
 }

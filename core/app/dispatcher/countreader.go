@@ -14,12 +14,12 @@ type CounterReader struct {
 	Counter *atomic.Int64
 }
 
-func (c *CounterReader) ReadMultiBufferTimeout(timeout time.Duration) (buf.MultiBuffer, error) {
-	mb, err := c.Reader.ReadMultiBufferTimeout(timeout)
+func (c *CounterReader) ReadMultiBufferTimeout(time.Duration) (buf.MultiBuffer, error) {
+	mb, err := c.Reader.ReadMultiBufferTimeout(time.Second)
 	if err != nil {
 		return nil, err
 	}
-	if !mb.IsEmpty() {
+	if mb.Len() > 0 {
 		c.Counter.Add(int64(mb.Len()))
 	}
 	return mb, nil
@@ -30,7 +30,7 @@ func (c *CounterReader) ReadMultiBuffer() (buf.MultiBuffer, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !mb.IsEmpty() {
+	if mb.Len() > 0 {
 		c.Counter.Add(int64(mb.Len()))
 	}
 	return mb, nil

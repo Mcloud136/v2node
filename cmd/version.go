@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	version  = "1.0.2" //use ldflags replace
+	version  = "TempVersion" //use ldflags replace
 	codename = "v2node"
 	intro    = "A V2board backend based on modified xray-core"
 )

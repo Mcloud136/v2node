@@ -71,7 +71,7 @@ func (c *Controller) nodeInfoMonitor(ctx context.Context) (err error) {
 			default:
 			}
 		} else {
-			log.Error("Reload channel is nil, cannot trigger reload")
+			log.Panic("Reload failed")
 		}
 	}
 	log.WithField("tag", c.tag).Debug("Node info no change")
@@ -103,7 +103,7 @@ func (c *Controller) nodeInfoMonitor(ctx context.Context) (err error) {
 
 	// update alive list
 	if newA != nil {
-		c.limiter.UpdateAliveList(newA)
+		c.limiter.AliveList = newA
 	}
 	// node no changed, check users
 	if len(newU) == 0 {
