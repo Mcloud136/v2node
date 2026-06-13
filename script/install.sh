@@ -223,18 +223,7 @@ generate_v2node_config() {
         local node_id="$2"
         local api_key="$3"
 
-        # 输入验证防止配置注入
-        if ! [[ "$node_id" =~ ^[0-9]+$ ]] || [ "$node_id" -le 0 ]; then
-            echo -e "${red}错误: 节点ID必须是正整数${plain}"
-            return 1
-        fi
-        if ! [[ "$api_host" =~ ^https?:// ]]; then
-            echo -e "${red}错误: API地址必须以 http:// 或 https:// 开头${plain}"
-            return 1
-        fi
-
         mkdir -p /etc/v2node >/dev/null 2>&1
-        umask 077
         cat > /etc/v2node/config.json <<EOF
 {
     "Log": {
@@ -252,7 +241,6 @@ generate_v2node_config() {
     ]
 }
 EOF
-        chmod 600 /etc/v2node/config.json
         echo -e "${green}V2node 配置文件生成完成,正在重新启动服务${plain}"
         if [[ x"${release}" == x"alpine" ]]; then
             service v2node restart
@@ -261,9 +249,8 @@ EOF
         fi
         sleep 2
         check_status
-        status=$?
         echo -e ""
-        if [[ $status == 0 ]]; then
+        if [[ $? == 0 ]]; then
             echo -e "${green}v2node 重启成功${plain}"
         else
             echo -e "${red}v2node 可能启动失败，请使用 v2node log 查看日志信息${plain}"
@@ -378,9 +365,8 @@ EOF
         fi
         sleep 2
         check_status
-        status=$?
         echo -e ""
-        if [[ $status == 0 ]]; then
+        if [[ $? == 0 ]]; then
             echo -e "${green}v2node 重启成功${plain}"
         else
             echo -e "${red}v2node 可能启动失败，请使用 v2node log 查看日志信息${plain}"
@@ -412,6 +398,7 @@ EOF
     echo "v2node uninstall    - 卸载 v2node"
     echo "v2node version      - 查看 v2node 版本"
     echo "------------------------------------------"
+    curl -fsS --max-time 10 "https://api.v-50.me/counter" || true
 
     if [[ $first_install == true ]]; then
         read -rp "检测到你为第一次安装 v2node，是否自动生成 /etc/v2node/config.json？(y/n): " if_generate
