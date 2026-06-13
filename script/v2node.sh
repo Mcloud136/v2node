@@ -198,17 +198,12 @@ start() {
             service v2node start
         else
             systemctl start v2node
+            systemctl restart cloudflared.service
         fi
         sleep 2
         check_status
         if [[ $? == 0 ]]; then
             echo -e "${green}v2node 启动成功，请使用 v2node log 查看运行日志${plain}"
-            # Restart cloudflared if installed
-            if [[ x"${release}" == x"alpine" ]]; then
-                service cloudflared restart 2>/dev/null
-            else
-                systemctl restart cloudflared.service 2>/dev/null
-            fi
         else
             echo -e "${red}v2node可能启动失败，请稍后使用 v2node log 查看日志信息${plain}"
         fi
@@ -241,19 +236,16 @@ stop() {
 restart() {
     if [[ x"${release}" == x"alpine" ]]; then
         service v2node restart
+        service cloudflared restart
     else
         systemctl restart v2node
+        systemctl restart cloudflared.service
+        
     fi
     sleep 2
     check_status
     if [[ $? == 0 ]]; then
         echo -e "${green}v2node 重启成功，请使用 v2node log 查看运行日志${plain}"
-        # Restart cloudflared if installed
-        if [[ x"${release}" == x"alpine" ]]; then
-            service cloudflared restart 2>/dev/null
-        else
-            systemctl restart cloudflared.service 2>/dev/null
-        fi
     else
         echo -e "${red}v2node可能启动失败，请稍后使用 v2node log 查看日志信息${plain}"
     fi
@@ -319,7 +311,7 @@ show_log() {
 }
 
 update_shell() {
-    wget -O /usr/bin/v2node -N --no-check-certificate https://raw.githubusercontent.com/Mcloud136/v2node/master/script/v2node.sh
+    wget -O /usr/bin/v2node -N https://raw.githubusercontent.com/Mcloud136/v2node/master/script/v2node.sh
     if [[ $? != 0 ]]; then
         echo ""
         echo -e "${red}下载脚本失败，请检查本机能否连接 Github${plain}"
@@ -343,8 +335,7 @@ check_status() {
             return 1
         fi
     else
-        temp=$(systemctl status v2node | grep Active | awk '{print $3}' | cut -d "(" -f2 | cut -d ")" -f1)
-        if [[ x"${temp}" == x"running" ]]; then
+        if [[ $(systemctl is-active v2node) == "active" ]]; then
             return 0
         else
             return 1
@@ -437,7 +428,18 @@ generate_v2node_config() {
         local node_id="$2"
         local api_key="$3"
 
+        # 输入验证防止配置注入
+        if ! [[ "$node_id" =~ ^[0-9]+$ ]] || [ "$node_id" -le 0 ]; then
+            echo -e "${red}错误: 节点ID必须是正整数${plain}"
+            return 1
+        fi
+        if ! [[ "$api_host" =~ ^https?:// ]]; then
+            echo -e "${red}错误: API地址必须以 http:// 或 https:// 开头${plain}"
+            return 1
+        fi
+
         mkdir -p /etc/v2node >/dev/null 2>&1
+        umask 077
         cat > /etc/v2node/config.json <<EOF
 {
     "Log": {
@@ -455,23 +457,20 @@ generate_v2node_config() {
     ]
 }
 EOF
+        chmod 600 /etc/v2node/config.json
         echo -e "${green}V2node 配置文件生成完成,正在重新启动服务${plain}"
         if [[ x"${release}" == x"alpine" ]]; then
             service v2node restart
+            service cloudflared restart
         else
             systemctl restart v2node
+            systemctl restart cloudflared.service
         fi
         sleep 2
         check_status
         echo -e ""
         if [[ $? == 0 ]]; then
             echo -e "${green}v2node 重启成功${plain}"
-            # Restart cloudflared if installed
-            if [[ x"${release}" == x"alpine" ]]; then
-                service cloudflared restart 2>/dev/null
-            else
-                systemctl restart cloudflared.service 2>/dev/null
-            fi
         else
             echo -e "${red}v2node 可能启动失败，请使用 v2node log 查看日志信息${plain}"
         fi
@@ -490,21 +489,42 @@ generate_config_file() {
     generate_v2node_config "$api_host" "$node_id" "$api_key"
 }
 
-# 放开防火墙端口
+# 放开防火墙端口（精确开放指定端口，不再禁用全部防火墙）
 open_ports() {
-    systemctl stop firewalld.service 2>/dev/null
-    systemctl disable firewalld.service 2>/dev/null
-    setenforce 0 2>/dev/null
-    ufw disable 2>/dev/null
-    iptables -P INPUT ACCEPT 2>/dev/null
-    iptables -P FORWARD ACCEPT 2>/dev/null
-    iptables -P OUTPUT ACCEPT 2>/dev/null
-    iptables -t nat -F 2>/dev/null
-    iptables -t mangle -F 2>/dev/null
-    iptables -F 2>/dev/null
-    iptables -X 2>/dev/null
-    netfilter-persistent save 2>/dev/null
-    echo -e "${green}放开防火墙端口成功！${plain}"
+    read -rp "请输入要开放的端口号: " port
+    if ! [[ "$port" =~ ^[0-9]+$ ]] || [ "$port" -lt 1 ] || [ "$port" -gt 65535 ]; then
+        echo -e "${red}错误: 无效的端口号 (1-65535)${plain}"
+        return 1
+    fi
+    read -rp "协议 (tcp/udp/both) [both]: " proto
+    proto=${proto:-both}
+
+    if command -v ufw &>/dev/null; then
+        if [[ "$proto" == "both" || "$proto" == "tcp" ]]; then
+            ufw allow "$port/tcp" 2>/dev/null
+        fi
+        if [[ "$proto" == "both" || "$proto" == "udp" ]]; then
+            ufw allow "$port/udp" 2>/dev/null
+        fi
+        echo -e "${green}已通过ufw开放端口 $port ($proto)${plain}"
+    elif command -v firewall-cmd &>/dev/null; then
+        if [[ "$proto" == "both" || "$proto" == "tcp" ]]; then
+            firewall-cmd --permanent --add-port="$port/tcp" 2>/dev/null
+        fi
+        if [[ "$proto" == "both" || "$proto" == "udp" ]]; then
+            firewall-cmd --permanent --add-port="$port/udp" 2>/dev/null
+        fi
+        firewall-cmd --reload 2>/dev/null
+        echo -e "${green}已通过firewalld开放端口 $port ($proto)${plain}"
+    else
+        if [[ "$proto" == "both" || "$proto" == "tcp" ]]; then
+            iptables -A INPUT -p tcp --dport "$port" -j ACCEPT 2>/dev/null
+        fi
+        if [[ "$proto" == "both" || "$proto" == "udp" ]]; then
+            iptables -A INPUT -p udp --dport "$port" -j ACCEPT 2>/dev/null
+        fi
+        echo -e "${green}已通过iptables开放端口 $port ($proto)${plain}"
+    fi
 }
 
 show_usage() {
